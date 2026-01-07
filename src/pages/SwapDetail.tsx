@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, Clock, MapPin, Star, MessageCircle, Video, ArrowLeftRight, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Star, MessageCircle, Video, ArrowLeftRight, User, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,12 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { SwapChatPanel } from "@/components/SwapChatPanel";
+import { SessionManager } from "@/components/SessionManager";
+import { SwapHistory } from "@/components/SwapHistory";
 import { mockSwaps, mockUsers } from "@/data/mockData";
 import { supabase } from "@/lib/supabase";
 import { swapService } from "@/lib/swapService";
+import { sessionService } from "@/lib/sessionService";
 import { profileService } from "@/lib/profileService";
 import { reviewService } from "@/lib/reviewService";
 
@@ -31,6 +36,9 @@ const SwapDetail = () => {
   const [rating, setRating] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCreator, setIsCreator] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [fetchingSessions, setFetchingSessions] = useState(false);
 
   const loadRating = async (userId: string) => {
     try {
@@ -67,24 +75,32 @@ const SwapDetail = () => {
         if (swapData) {
           setSwap(swapData);
 
-          // Check if current user is the creator
-          if (user && swapData.user_id === user.id) {
-            setIsCreator(true);
-          }
+          // Check if current user is involved in the swap
+          if (user) {
+            const isOwner = swapData.user_id === user.id;
+            setIsCreator(isOwner);
 
-          // Load partner profile
-          const profile = await profileService.getProfile(swapData.user_id);
-          if (profile) {
-            const avgRating = await reviewService.getAverageRating(swapData.user_id);
-            setRating(avgRating);
-            setPartner({
-              id: swapData.user_id,
-              name: profile.full_name || "User",
-              avatar: profile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
-              location: profile.city || "Location",
-              country: profile.country || "Country",
-              rating: avgRating,
-            });
+            // Correctly identify the partner ID
+            // If I am the owner, the partner is partner_id
+            // If I am the partner, the partner is user_id
+            const partnerId = isOwner ? swapData.partner_id : swapData.user_id;
+
+            if (partnerId) {
+              // Load partner profile
+              const profile = await profileService.getProfile(partnerId);
+              if (profile) {
+                const avgRating = await reviewService.getAverageRating(partnerId);
+                setRating(avgRating);
+                setPartner({
+                  id: partnerId,
+                  name: profile.full_name || "User",
+                  avatar: profile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
+                  location: profile.city || "Location",
+                  country: profile.country || "Country",
+                  rating: avgRating,
+                });
+              }
+            }
           }
         }
       } catch (error) {
@@ -96,6 +112,36 @@ const SwapDetail = () => {
 
     loadSwap();
   }, [id, mockSwap]);
+
+  useEffect(() => {
+    if (swap?.id) {
+      loadSessions();
+    }
+  }, [swap?.id]);
+
+  const loadSessions = async () => {
+    try {
+      setFetchingSessions(true);
+      const data = await sessionService.getSessionsBySwap(id!);
+      setSessions(data);
+    } catch (error) {
+      console.error("Error loading sessions:", error);
+    } finally {
+      setFetchingSessions(false);
+    }
+  };
+
+  const getNearestSession = () => {
+    if (!sessions.length) return null;
+    const futureSessions = sessions
+      .filter(s => s.status === 'scheduled' && new Date(s.scheduled_at) > new Date())
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+
+    return futureSessions.length > 0 ? futureSessions[0] : null;
+  };
+
+  const nearestSession = getNearestSession();
+  const sessionCount = sessions.length;
 
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -144,15 +190,35 @@ const SwapDetail = () => {
 
   const progressPercent = swap.totalSessions ? (swap.completedSessions! / swap.totalSessions) * 100 : 0;
 
-  const handleScheduleSession = () => {
+  const handleScheduleSession = async () => {
     if (!sessionDate || !sessionTime) {
       toast({ title: "Please select date and time", variant: "destructive" });
       return;
     }
-    toast({ title: "Session Scheduled", description: `Your session is scheduled for ${sessionDate} at ${sessionTime}` });
-    setScheduleOpen(false);
-    setSessionDate("");
-    setSessionTime("");
+
+    try {
+      const scheduledAt = new Date(`${sessionDate}T${sessionTime}`).toISOString();
+      await sessionService.createSession({
+        swap_id: swap.id,
+        scheduled_at: scheduledAt
+      });
+
+      toast({
+        title: "Session Scheduled",
+        description: `Session scheduled for ${sessionDate} at ${sessionTime}. Meet link generated!`
+      });
+
+      setScheduleOpen(false);
+      setSessionDate("");
+      setSessionTime("");
+      loadSessions(); // This will refresh session list, count and next session
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to schedule session",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleLeaveReview = async () => {
@@ -234,8 +300,8 @@ const SwapDetail = () => {
           <Link to="/swaps"><ArrowLeft className="h-4 w-4 mr-2" />Back to Swaps</Link>
         </Button>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid lg:grid-cols-5 gap-8">
+          <div className="lg:col-span-3 space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -289,22 +355,34 @@ const SwapDetail = () => {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-lg">Schedule & Details</CardTitle>
+                <Button
+                  variant="terracotta"
+                  size="sm"
+                  onClick={() => setIsChatOpen(true)}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Messages
+                </Button>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
                   <Calendar className="h-5 w-5 text-terracotta" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Schedule</p>
-                    <p className="font-medium">{swap.schedule || "To be determined"}</p>
+                    <p className="text-sm text-muted-foreground">Nearest Session</p>
+                    <p className="font-medium">
+                      {nearestSession
+                        ? `${new Date(nearestSession.scheduled_at).toLocaleDateString()} ${new Date(nearestSession.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : "No upcoming sessions"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
-                  <Clock className="h-5 w-5 text-teal" />
+                  <Video className="h-5 w-5 text-teal" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Duration</p>
-                    <p className="font-medium">{swap.duration || swap.totalHours || "Not specified"}</p>
+                    <p className="text-sm text-muted-foreground">Number of Sessions</p>
+                    <p className="font-medium">{sessionCount} sessions</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
@@ -318,14 +396,14 @@ const SwapDetail = () => {
                   <Clock className="h-5 w-5 text-navy" />
                   <div>
                     <p className="text-sm text-muted-foreground">Total Hours</p>
-                    <p className="font-medium">{swap.totalHours || "N/A"} hours</p>
+                    <p className="font-medium">{swap.duration || swap.total_hours || "N/A"} hours</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {partner && (
               <Card>
                 <CardHeader>
@@ -336,26 +414,17 @@ const SwapDetail = () => {
                     <img src={partner.avatar} alt={partner.name} className="h-16 w-16 rounded-full object-cover ring-2 ring-border" />
                     <div>
                       <h3 className="font-semibold">{partner.name}</h3>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />{partner.location}, {partner.country}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Star className="h-4 w-4 fill-golden text-golden" />
-                        <span className="text-sm font-medium">{partner.rating}</span>
-                        <span className="text-xs text-muted-foreground">({partner.reviewCount} reviews)</span>
-                      </div>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">{partner.bio}</p>
                   <div className="flex gap-2">
-                    {!isCreator && (
+                    {partner && (
                       <Button variant="outline" className="flex-1" asChild>
                         <Link to={`/messages?user=${partner.id}&swap=${swap.id}`}>
                           <MessageCircle className="h-4 w-4 mr-2" />Message
                         </Link>
                       </Button>
                     )}
-                    <Button variant="ghost" className={isCreator ? "w-full" : "flex-1"} asChild>
+                    <Button variant="ghost" className={!partner ? "w-full" : "flex-1"} asChild>
                       <Link to={`/user/${partner.id}`}>
                         <User className="h-4 w-4 mr-2" />Profile
                       </Link>
@@ -447,6 +516,33 @@ const SwapDetail = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Session Manager - Only show if sessions exist */}
+            {(swap.status === 'active' || swap.status === 'open') && sessions.length > 0 && (
+              <SessionManager swapId={swap.id} sessions={sessions} loading={fetchingSessions} />
+            )}
+
+            {/* Slide-in Chat Panel */}
+            {partner && currentUserId && isChatOpen && (
+              <div className="fixed inset-y-0 right-0 w-full sm:w-[400px] z-50 bg-background shadow-2xl animate-in slide-in-from-right duration-300">
+                <SwapChatPanel
+                  swapId={swap.id}
+                  currentUserId={currentUserId}
+                  otherUserId={partner.id}
+                  otherUserName={partner.name}
+                  otherUserAvatar={partner.avatar}
+                  onClose={() => setIsChatOpen(false)}
+                />
+              </div>
+            )}
+
+            {/* Overlay for chat panel */}
+            {isChatOpen && (
+              <div
+                className="fixed inset-0 bg-black/20 z-40 animate-in fade-in"
+                onClick={() => setIsChatOpen(false)}
+              />
+            )}
           </div>
         </div>
       </main>

@@ -73,9 +73,7 @@ const Profile = () => {
           Promise.all([
             reviewService.getReviewsForUser(user.id),
             reviewService.getAverageRating(user.id),
-            swapService.getAllSwaps().then(allSwaps =>
-              allSwaps.filter(swap => swap.user_id === user.id && swap.status === 'completed').length
-            )
+            swapService.getCompletedSwapsCount(user.id)
           ]).then(([userReviews, avgRating, completedCount]) => {
             setReviews(userReviews);
             setRating(avgRating);

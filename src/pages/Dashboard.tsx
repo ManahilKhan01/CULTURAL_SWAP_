@@ -66,19 +66,20 @@ const Dashboard = () => {
       if (!user) return;
 
       // Parallel fetching for performance
-      const [profile, userSwaps, conversations, rating, allSwaps, notices] = await Promise.all([
+      const [profile, userSwaps, conversations, rating, allSwaps, notices, completedCount] = await Promise.all([
         profileService.getProfile(user.id),
         swapService.getUserSwapsWithPartner(user.id),
         messageService.getConversations(user.id),
         reviewService.getAverageRating(user.id),
         swapService.getAllSwaps(),
-        supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4)
+        supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4),
+        swapService.getCompletedSwapsCount(user.id)
       ]);
 
       setUserProfile(profile);
 
-      // 1. Swaps Completed
-      const completedCount = userSwaps.filter((s: any) => s.status === 'completed').length;
+      // 1. Swaps Completed - now using the centralized count from swapService
+      // This count includes both created and joined swaps that are completed.
 
       // 2. Average Rating & Star Logic is handled in the UI loop
 
@@ -192,25 +193,29 @@ const Dashboard = () => {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-terracotta/20 scrollbar-track-transparent">
                   {upcomingSessions.length > 0 ? (
                     upcomingSessions.map((session) => (
                       <div
                         key={session.id}
-                        className="flex items-center justify-between p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+                        className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-all border border-transparent hover:border-border"
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${session.type === 'Teaching' ? 'bg-terracotta/10' : 'bg-teal/10'
+                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${session.type === 'Teaching' ? 'bg-terracotta/10' : 'bg-teal/10'
                             }`}>
-                            <Calendar className={`h-5 w-5 ${session.type === 'Teaching' ? 'text-terracotta' : 'text-teal'
+                            <Calendar className={`h-6 w-6 ${session.type === 'Teaching' ? 'text-terracotta' : 'text-teal'
                               }`} />
                           </div>
-                          <div>
-                            <p className="font-semibold">{session.title}</p>
-                            <p className="text-sm text-muted-foreground">{session.partner}</p>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{session.title}</p>
+                            <p className="text-sm text-muted-foreground truncate">{session.partner}</p>
+                            <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{session.time}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-2 shrink-0">
                           <Badge variant={session.type === 'Teaching' ? 'default' : 'secondary'} className={
                             session.type === 'Teaching'
                               ? 'bg-terracotta/10 text-terracotta border-0'
@@ -218,12 +223,11 @@ const Dashboard = () => {
                           }>
                             {session.type}
                           </Badge>
-                          <p className="text-sm text-muted-foreground mt-1">{session.time}</p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-6 text-muted-foreground">
+                    <div className="text-center py-6 w-full text-muted-foreground">
                       <p className="text-sm italic">No upcoming sessions found</p>
                     </div>
                   )}

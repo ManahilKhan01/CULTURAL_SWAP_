@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Send, Loader2, Handshake, ChevronLeft, MoreVertical, CheckCheck } from "lucide-react";
+import { Search, Send, Loader2, Handshake, ChevronLeft, MoreVertical, CheckCheck, Paperclip, X, Download, FileText, Image as ImageIcon, File } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { messageService } from "@/lib/messageService";
 import { profileService } from "@/lib/profileService";
 import { swapService } from "@/lib/swapService";
+import { attachmentService } from "@/lib/attachmentService";
+import { historyService } from "@/lib/historyService";
 import { offerService, Offer } from "@/lib/offerService";
 import { useToast } from "@/hooks/use-toast";
 import { CreateOfferDialog } from "@/components/CreateOfferDialog";
@@ -34,6 +36,9 @@ const Messages = () => {
   const [currentSwap, setCurrentSwap] = useState<any>(null);
   const [createOfferOpen, setCreateOfferOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<Record<string, any[]>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -86,6 +91,17 @@ const Messages = () => {
           }
 
           setMessages(convMessages);
+
+          // Load attachments for all messages
+          const attachmentsMap: Record<string, any[]> = {};
+          for (const msg of convMessages) {
+            const msgAttachments = await attachmentService.getAttachmentsByMessage(msg.id);
+            if (msgAttachments.length > 0) {
+              attachmentsMap[msg.id] = msgAttachments;
+            }
+          }
+          setAttachments(attachmentsMap);
+
           setSelectedConversation({
             id: convId,
             otherUserId: userIdParam,
@@ -151,6 +167,13 @@ const Messages = () => {
               const next = [...prev, newMsg].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
               return next;
             });
+
+            // Load attachments for new message
+            const msgAttachments = await attachmentService.getAttachmentsByMessage(newMsg.id);
+            if (msgAttachments.length > 0) {
+              setAttachments(prev => ({ ...prev, [newMsg.id]: msgAttachments }));
+            }
+
             loadConversations(currentUser.id);
           }
         }
@@ -181,7 +204,7 @@ const Messages = () => {
   }, [selectedConversation?.id, currentUser]);
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !selectedConversation || !currentUser) return;
+    if (!messageText.trim() && selectedFiles.length === 0) return;
 
     try {
       setSending(true);
@@ -190,12 +213,48 @@ const Messages = () => {
         receiver_id: selectedConversation.otherUserId,
         conversation_id: selectedConversation.id,
         swap_id: selectedConversation.swapId || undefined,
-        content: messageText.trim(),
+        content: messageText.trim() || "(File attachment)",
       });
 
       if (newMessage) {
+        // Upload attachments if any
+        if (selectedFiles.length > 0) {
+          const uploadedAttachments = [];
+          for (const file of selectedFiles) {
+            const attachment = await attachmentService.createAttachment(file, newMessage.id);
+            uploadedAttachments.push(attachment);
+          }
+          setAttachments(prev => ({
+            ...prev,
+            [newMessage.id]: uploadedAttachments
+          }));
+
+          // Log file exchange activity if swap context exists
+          if (selectedConversation.swapId) {
+            await historyService.logActivity({
+              swap_id: selectedConversation.swapId,
+              user_id: currentUser.id,
+              activity_type: 'file_exchange',
+              description: `Shared ${selectedFiles.length} file(s)`,
+              metadata: { file_count: selectedFiles.length }
+            });
+          }
+        }
+
+        // Log message activity if swap context exists
+        if (selectedConversation.swapId) {
+          await historyService.logActivity({
+            swap_id: selectedConversation.swapId,
+            user_id: currentUser.id,
+            activity_type: 'message',
+            description: 'Sent a message',
+            metadata: { message_id: newMessage.id }
+          });
+        }
+
         setMessages(prev => [...prev, newMessage]);
         setMessageText("");
+        setSelectedFiles([]);
         loadConversations(currentUser.id);
       }
     } catch (error: any) {
@@ -222,6 +281,16 @@ const Messages = () => {
         otherProfile,
       });
       setMessages(convMessages);
+
+      // Load attachments for all messages
+      const attachmentsMap: Record<string, any[]> = {};
+      for (const msg of convMessages) {
+        const msgAttachments = await attachmentService.getAttachmentsByMessage(msg.id);
+        if (msgAttachments.length > 0) {
+          attachmentsMap[msg.id] = msgAttachments;
+        }
+      }
+      setAttachments(attachmentsMap);
 
       if (conversation.swapId) {
         const swap = await swapService.getSwapById(conversation.swapId);
@@ -400,17 +469,43 @@ const Messages = () => {
                                   onOfferUpdated={handleOfferCreated}
                                 />
                               ) : (
-                                <div
-                                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${isMe
-                                    ? 'bg-terracotta text-white rounded-br-sm'
-                                    : 'bg-white text-foreground rounded-bl-sm border border-border/50'
-                                    }`}
-                                >
-                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                                  <div className={`text-[10px] mt-1 flex items-center gap-1 ${isMe ? 'text-white/80 justify-end' : 'text-muted-foreground'}`}>
-                                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    {isMe && <CheckCheck className="h-3 w-3" />}
+                                <div className="space-y-1">
+                                  <div
+                                    className={`rounded-2xl px-4 py-2.5 shadow-sm ${isMe
+                                      ? 'bg-terracotta text-white rounded-br-sm'
+                                      : 'bg-white text-foreground rounded-bl-sm border border-border/50'
+                                      }`}
+                                  >
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                    <div className={`text-[10px] mt-1 flex items-center gap-1 ${isMe ? 'text-white/80 justify-end' : 'text-muted-foreground'}`}>
+                                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {isMe && <CheckCheck className="h-3 w-3" />}
+                                    </div>
                                   </div>
+                                  {/* Attachments */}
+                                  {attachments[message.id]?.map((attachment: any) => (
+                                    <div key={attachment.id} className="rounded-lg overflow-hidden">
+                                      {attachmentService.isImage(attachment.file_type) ? (
+                                        <img
+                                          src={attachment.url}
+                                          alt={attachment.file_name}
+                                          className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90"
+                                          onClick={() => window.open(attachment.url, '_blank')}
+                                        />
+                                      ) : (
+                                        <a
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg hover:bg-muted text-sm"
+                                        >
+                                          <FileText className="h-4 w-4" />
+                                          <span className="truncate">{attachment.file_name}</span>
+                                          <Download className="h-3 w-3 ml-auto" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -427,7 +522,46 @@ const Messages = () => {
 
                   {/* Message Input */}
                   <div className="p-4 bg-muted/20 border-t border-border">
+                    {/* Selected Files Preview */}
+                    {selectedFiles.length > 0 && (
+                      <div className="mb-2 space-y-1">
+                        {selectedFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm"
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            <span className="flex-1 truncate">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {attachmentService.formatFileSize(file.size)}
+                            </span>
+                            <button onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== index))}>
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="container max-w-4xl mx-auto flex gap-2 items-end">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          setSelectedFiles(prev => [...prev, ...files]);
+                        }}
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Paperclip className="h-5 w-5" />
+                      </Button>
                       <div className="flex-1 bg-background rounded-2xl border border-muted-foreground/20 px-3 py-1 flex items-end shadow-sm focus-within:ring-1 focus-within:ring-terracotta/50">
                         <Textarea
                           placeholder="Type your message..."
@@ -447,7 +581,7 @@ const Messages = () => {
                         variant="terracotta"
                         size="icon"
                         onClick={handleSendMessage}
-                        disabled={sending || !messageText.trim()}
+                        disabled={sending || (!messageText.trim() && selectedFiles.length === 0)}
                         className="h-11 w-11 rounded-2xl shadow-md transition-transform active:scale-95"
                       >
                         {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}

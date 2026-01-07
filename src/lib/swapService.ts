@@ -250,6 +250,27 @@ export const swapService = {
     }
   },
 
+  // Get total count of completed swaps for a user (as owner or partner)
+  async getCompletedSwapsCount(userId: string) {
+    try {
+      const { count, error } = await supabase
+        .from('swaps')
+        .select('*', { count: 'exact', head: true })
+        .or(`user_id.eq.${userId},partner_id.eq.${userId}`)
+        .eq('status', 'completed');
+
+      if (error) {
+        console.error('Error fetching completed swaps count:', error);
+        throw error;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('swapService.getCompletedSwapsCount error:', error);
+      throw error;
+    }
+  },
+
   // Cancel a swap - sets status to cancelled
   async cancelSwap(swapId: string) {
     try {
