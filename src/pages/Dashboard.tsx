@@ -26,43 +26,41 @@ const Dashboard = () => {
   const [recommendedSwaps, setRecommendedSwaps] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  const profileCompletion = useMemo(() => {
-    if (!userProfile) return 0;
-    const fields = [
-      'full_name',
-      'profile_image_url',
-      'bio',
-      'city',
-      'country',
-      'skills_offered',
-      'skills_wanted'
-    ];
-    const filledFields = fields.filter(f => {
-      const val = userProfile[f];
-      if (Array.isArray(val)) return val.length > 0;
-      return !!val;
-    });
-    return Math.round((filledFields.length / fields.length) * 100);
-  }, [userProfile]);
-
   const completionSteps = useMemo(() => {
     if (!userProfile) return [];
     return [
-      { label: "Add profile photo", completed: !!userProfile.profile_image_url },
-      { label: "Complete bio", completed: !!userProfile.bio },
-      { label: "Add skills offered", completed: (userProfile.skills_offered?.length || 0) >= 1 },
-      { label: "Add location", completed: !!userProfile.city },
+      { id: 'photo', label: "Add profile photo", completed: !!userProfile.profile_image_url },
+      { id: 'bio', label: "Complete bio", completed: !!userProfile.bio },
+      { id: 'skills', label: "Add skills offered", completed: Array.isArray(userProfile.skills_offered) ? userProfile.skills_offered.length > 0 : !!userProfile.skills_offered },
+      { id: 'location', label: "Add location (City & Country)", completed: !!userProfile.city && !!userProfile.country },
+      { id: 'skills_wanted', label: "Add skills you want", completed: Array.isArray(userProfile.skills_wanted) ? userProfile.skills_wanted.length > 0 : !!userProfile.skills_wanted },
     ];
   }, [userProfile]);
 
+  const profileCompletion = useMemo(() => {
+    if (completionSteps.length === 0) return 0;
+    const completedCount = completionSteps.filter(s => s.completed).length;
+    return Math.round((completedCount / completionSteps.length) * 100);
+  }, [completionSteps]);
+
   useEffect(() => {
     fetchDashboardData();
+    
+    // Listen for profile updates from other pages
+    const handleProfileUpdate = () => {
+      console.log("Profile updated event received, refreshing dashboard...");
+      fetchDashboardData();
+    };
+    
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return;
 
       // Parallel fetching for performance
@@ -313,8 +311,8 @@ const Dashboard = () => {
                     <Progress value={profileCompletion} className="h-2" />
                   </div>
                   <div className="space-y-2 text-sm">
-                    {completionSteps.map((step, idx) => (
-                      <div key={idx} className={`flex items-center gap-2 ${step.completed ? 'text-teal' : 'text-muted-foreground'}`}>
+                    {completionSteps.map((step) => (
+                      <div key={step.id} className={`flex items-center gap-2 ${step.completed ? 'text-teal' : 'text-muted-foreground'}`}>
                         <div className={`h-2 w-2 rounded-full ${step.completed ? 'bg-teal' : 'bg-muted'}`} />
                         {step.label} {step.completed ? '✓' : ''}
                       </div>

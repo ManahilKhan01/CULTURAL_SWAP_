@@ -382,7 +382,7 @@ const Messages = () => {
                       >
                         <div className="relative flex-shrink-0">
                           <img
-                            src={profile?.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                            src={profile?.profile_image_url || "/placeholder.svg"}
                             alt="Avatar"
                             className="h-12 w-12 rounded-full object-cover ring-2 ring-background shadow-sm"
                           />
@@ -424,7 +424,7 @@ const Messages = () => {
                       </Button>
                       <div className="relative">
                         <img
-                          src={otherUserProfile?.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                          src={otherUserProfile?.profile_image_url || "/placeholder.svg"}
                           alt="Avatar"
                           className="h-10 w-10 rounded-full object-cover shadow-sm ring-1 ring-border"
                         />

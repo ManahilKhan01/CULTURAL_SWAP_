@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Calendar, Clock, MapPin, Star, MessageCircle, Video, ArrowLeftRight, User, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,22 +16,27 @@ import Footer from "@/components/layout/Footer";
 import { SwapChatPanel } from "@/components/SwapChatPanel";
 import { SessionManager } from "@/components/SessionManager";
 import { SwapHistory } from "@/components/SwapHistory";
+import { CreateOfferDialog } from "@/components/CreateOfferDialog";
 import { mockSwaps, mockUsers } from "@/data/mockData";
 import { supabase } from "@/lib/supabase";
 import { swapService } from "@/lib/swapService";
 import { sessionService } from "@/lib/sessionService";
 import { profileService } from "@/lib/profileService";
 import { reviewService } from "@/lib/reviewService";
+import { messageService } from "@/lib/messageService";
 
 const SwapDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const source = searchParams.get('source'); // 'discover' if coming from Discover, null otherwise
 
   // Try to find in mock first, then database
   const mockSwap = mockSwaps.find(s => s.id === id);
   const [swap, setSwap] = useState<any>(mockSwap || null);
   const [partner, setPartner] = useState<any>(null);
+  const [swapCreator, setSwapCreator] = useState<any>(null);
   const [loading, setLoading] = useState(!mockSwap);
   const [rating, setRating] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -80,6 +85,22 @@ const SwapDetail = () => {
             const isOwner = swapData.user_id === user.id;
             setIsCreator(isOwner);
 
+            // If viewing from Discover, load the swap creator's info
+            if (source === 'discover') {
+              const creatorProfile = await profileService.getProfile(swapData.user_id);
+              if (creatorProfile) {
+                const creatorRating = await reviewService.getAverageRating(swapData.user_id);
+                setSwapCreator({
+                  id: swapData.user_id,
+                  name: creatorProfile.full_name || "User",
+                  avatar: creatorProfile.profile_image_url || "/placeholder.svg",
+                  location: creatorProfile.city || "Location",
+                  country: creatorProfile.country || "Country",
+                  rating: creatorRating,
+                });
+              }
+            }
+
             // Correctly identify the partner ID
             // If I am the owner, the partner is partner_id
             // If I am the partner, the partner is user_id
@@ -94,7 +115,7 @@ const SwapDetail = () => {
                 setPartner({
                   id: partnerId,
                   name: profile.full_name || "User",
-                  avatar: profile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
+                  avatar: profile.profile_image_url || "/placeholder.svg",
                   location: profile.city || "Location",
                   country: profile.country || "Country",
                   rating: avgRating,
@@ -146,10 +167,14 @@ const SwapDetail = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [createOfferOpen, setCreateOfferOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string>("");
   const [sessionDate, setSessionDate] = useState("");
   const [sessionTime, setSessionTime] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
+  const [showCancelReview, setShowCancelReview] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   if (loading) {
     return (
@@ -276,12 +301,72 @@ const SwapDetail = () => {
     }
   };
 
+  const handleLeaveCancelReview = async () => {
+    if (!reviewText.trim()) {
+      toast({ title: "Please write a review", variant: "destructive" });
+      return;
+    }
+
+    if (!partner) {
+      toast({ title: "Partner not found", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Insert review into database
+      const { data, error } = await supabase.from("reviews").insert([
+        {
+          reviewer_id: user.id,
+          reviewee_id: partner.id,
+          swap_id: swap.id,
+          rating: reviewRating,
+          comment: reviewText,
+          would_recommend: true,
+        },
+      ]);
+
+      if (error) throw error;
+
+      // Refresh rating immediately
+      await loadRating(partner.id);
+
+      // Dispatch event so Discover and other pages update
+      window.dispatchEvent(new CustomEvent('ratingUpdated', {
+        detail: { userId: partner.id, rating: rating }
+      }));
+
+      toast({
+        title: "Review Submitted",
+        description: "Thank you for your feedback! Redirecting to your swaps..."
+      });
+      setShowCancelReview(false);
+      setReviewSubmitted(true);
+      setReviewText("");
+      setReviewRating(5);
+      
+      // Redirect to swaps after a short delay
+      setTimeout(() => navigate("/swaps"), 1500);
+    } catch (err: any) {
+      console.error("Review submission error:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to submit review",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleCancelSwap = async () => {
     try {
       await swapService.cancelSwap(swap.id);
-      toast({ title: "Swap Cancelled", description: "The swap has been cancelled successfully." });
+      toast({ title: "Swap Cancelled", description: "Please leave a review for your swap partner." });
       setCancelOpen(false);
-      navigate("/swaps");
+      // Show review dialog after cancelling instead of redirecting
+      setShowCancelReview(true);
     } catch (error: any) {
       console.error("Error cancelling swap:", error);
       toast({
@@ -289,6 +374,63 @@ const SwapDetail = () => {
         description: error.message || "Failed to cancel swap",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleCreateOffer = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      if (!swap.user_id) throw new Error("Swap user not found");
+
+      // Get or create conversation with the swap creator
+      const convId = await messageService.getOrCreateConversation(user.id, swap.user_id);
+      setConversationId(convId);
+      
+      // Open the CreateOfferDialog which will handle the full flow
+      setCreateOfferOpen(true);
+    } catch (error: any) {
+      console.error("Error initializing offer creation:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to initialize offer",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOfferCreated = async () => {
+    try {
+      // After offer is created, reload the swap to get updated partner info
+      const updated = await swapService.getSwapById(id!);
+      if (updated) {
+        setSwap(updated);
+        
+        // If partner was set, load their profile
+        if (updated.partner_id && updated.partner_id !== currentUserId) {
+          const profile = await profileService.getProfile(updated.partner_id);
+          if (profile) {
+            const avgRating = await reviewService.getAverageRating(updated.partner_id);
+            setPartner({
+              id: updated.partner_id,
+              name: profile.full_name || "User",
+              avatar: profile.profile_image_url || "/placeholder.svg",
+              location: profile.city || "Location",
+              country: profile.country || "Country",
+              rating: avgRating,
+            });
+          }
+        }
+      }
+
+      setCreateOfferOpen(false);
+      toast({
+        title: "Offer Created!",
+        description: "Your offer has been sent. The other participant will see it in the chat.",
+      });
+    } catch (error: any) {
+      console.error("Error after offer created:", error);
     }
   };
 
@@ -354,6 +496,8 @@ const SwapDetail = () => {
               </CardContent>
             </Card>
 
+            {/* Show Schedule & Details only if partner exists (deal is active) AND not viewing from Discover */}
+            {partner && source !== 'discover' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-lg">Schedule & Details</CardTitle>
@@ -401,10 +545,47 @@ const SwapDetail = () => {
                 </div>
               </CardContent>
             </Card>
+            )}
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            {partner && (
+            {/* Show Swap Creator card when viewing from Discover */}
+            {source === 'discover' && swapCreator && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Swap Creator</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <img src={swapCreator.avatar} alt={swapCreator.name} className="h-16 w-16 rounded-full object-cover ring-2 ring-border" />
+                    <div>
+                      <h3 className="font-semibold">{swapCreator.name}</h3>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="h-4 w-4 fill-golden text-golden" />
+                        <span className="text-sm font-medium">{swapCreator.rating?.toFixed(1) || '0.0'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>{swapCreator.location}, {swapCreator.country}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" asChild>
+                      <Link to={`/messages?user=${swapCreator.id}&swap=${swap.id}`}>
+                        <MessageCircle className="h-4 w-4 mr-2" />Message
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" className="flex-1" asChild>
+                      <Link to={`/user/${swapCreator.id}`}>
+                        <User className="h-4 w-4 mr-2" />Profile
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {partner && source !== 'discover' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Swap Partner</CardTitle>
@@ -434,6 +615,40 @@ const SwapDetail = () => {
               </Card>
             )}
 
+            {/* Show Create Offer Card if viewing from Discover, no partner yet, and swap is open/pending */}
+            {source === 'discover' && !partner && swap && (swap.status === 'open' || swap.status === 'pending' || !swap.partner_id) && (
+              <Card className="border-green-500/30 bg-gradient-to-br from-green-50 to-green-50/30">
+                <CardHeader>
+                  <CardTitle className="text-lg text-green-700">Create Offer</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Interested in this skill exchange? Click below to create an offer and start the swap!
+                  </p>
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    onClick={handleCreateOffer}
+                  >
+                    Create Offer
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* CreateOfferDialog - Using the same component as Messages */}
+            {conversationId && (
+              <CreateOfferDialog
+                open={createOfferOpen}
+                onOpenChange={setCreateOfferOpen}
+                conversationId={conversationId}
+                swapId={id}
+                receiverId={swap.user_id}
+                onOfferCreated={handleOfferCreated}
+              />
+            )}
+
+            {/* Show Actions Card if partner exists AND not viewing from Discover */}
+            {partner && source !== 'discover' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Actions</CardTitle>
@@ -495,6 +710,41 @@ const SwapDetail = () => {
                   </DialogContent>
                 </Dialog>
 
+                {/* Cancel Swap - Review Dialog */}
+                <Dialog open={showCancelReview} onOpenChange={setShowCancelReview}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Leave a Review for Your Swap Partner</DialogTitle>
+                      <DialogDescription>
+                        Before leaving, please share your experience with {partner?.name || "your partner"}. Your feedback helps maintain our community quality.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Rating</Label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button key={star} onClick={() => setReviewRating(star)}>
+                              <Star className={`h-8 w-8 cursor-pointer transition-colors ${star <= reviewRating ? "fill-golden text-golden" : "text-muted hover:text-golden"}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cancelReview">Your Review</Label>
+                        <Textarea id="cancelReview" rows={4} placeholder="Share your experience..." value={reviewText} onChange={(e) => setReviewText(e.target.value)} />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => {
+                        setShowCancelReview(false);
+                        navigate("/swaps");
+                      }}>Skip Review</Button>
+                      <Button variant="terracotta" onClick={handleLeaveCancelReview}>Submit Review</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
                 {swap.status !== "completed" && (
                   <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
                     <DialogTrigger asChild>
@@ -516,6 +766,7 @@ const SwapDetail = () => {
                 )}
               </CardContent>
             </Card>
+            )}
 
             {/* Session Manager - Only show if sessions exist */}
             {(swap.status === 'active' || swap.status === 'open') && sessions.length > 0 && (

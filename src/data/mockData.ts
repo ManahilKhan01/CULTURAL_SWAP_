@@ -159,7 +159,7 @@ export const mockUsers: User[] = [
   {
     id: '4',
     name: 'Erik Lindgren',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop',
+    avatar: "/assets/images/profile_placeholder.png",
     location: 'Stockholm',
     country: 'Sweden',
     bio: 'Woodworking craftsman with 20 years of experience. Want to learn new cooking traditions.',
@@ -343,7 +343,7 @@ export const mockReviews: Review[] = [
 
 // Mock Conversations
 export const mockConversations: Conversation[] = [
-  {
+  { 
     id: 'c1',
     participants: [mockUsers[0], mockUsers[2]],
     lastMessage: {

@@ -136,7 +136,8 @@ const Swaps = () => {
 
   // Group swaps by status
   const activeSwaps = filteredSwaps.filter(s => s.status === "active" || s.status === "open");
-  const completedSwaps = filteredSwaps.filter(s => s.status === "completed" || s.status === "cancelled");
+  const completedSwaps = filteredSwaps.filter(s => s.status === "completed");
+  const cancelledSwaps = filteredSwaps.filter(s => s.status === "cancelled");
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -254,7 +255,7 @@ const Swaps = () => {
               {hasPartner && otherUser ? (
                 <>
                   <img
-                    src={otherUser.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                    src={otherUser.profile_image_url || "/placeholder.svg"}
                     alt={otherUser.full_name || "Partner"}
                     className="h-12 w-12 rounded-full object-cover ring-2 ring-border"
                   />
@@ -601,6 +602,10 @@ const Swaps = () => {
               <CheckCircle className="h-4 w-4" />
               Completed ({completedSwaps.length})
             </TabsTrigger>
+            <TabsTrigger value="cancelled" className="gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Cancelled ({cancelledSwaps.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="active">
@@ -615,11 +620,16 @@ const Swaps = () => {
                 <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="font-semibold text-lg mb-2">No Active Swaps</h3>
                 <p className="text-muted-foreground mb-4">
-                  Start discovering skills to begin your first swap!
+                  Create your first skill swap or discover skills to begin!
                 </p>
-                <Button variant="terracotta" asChild>
-                  <Link to="/discover">Discover Skills</Link>
-                </Button>
+                <div className="flex gap-3 justify-center">
+                  <Button variant="terracotta" asChild>
+                    <Link to="/swap/create">Add Skill</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/discover">Discover Skills</Link>
+                  </Button>
+                </div>
               </Card>
             )}
           </TabsContent>
@@ -637,6 +647,24 @@ const Swaps = () => {
                 <h3 className="font-semibold text-lg mb-2">No Completed Swaps Yet</h3>
                 <p className="text-muted-foreground">
                   Complete your active swaps to see them here.
+                </p>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="cancelled">
+            {cancelledSwaps.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cancelledSwaps.map((swap) => (
+                  <SwapCard key={swap.id} swap={swap} />
+                ))}
+              </div>
+            ) : (
+              <Card className="p-12 text-center">
+                <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">No Cancelled Swaps</h3>
+                <p className="text-muted-foreground">
+                  Your cancelled swaps will appear here.
                 </p>
               </Card>
             )}

@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -188,13 +189,20 @@ const Signup = () => {
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
-                  type={showPassword ? "text" : "password"}
+                  type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm password"
                   className="pl-10 pr-10"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   disabled={isLoading}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 

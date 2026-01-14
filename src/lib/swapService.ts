@@ -43,7 +43,7 @@ export const swapService = {
       const { data, error } = await supabase
         .from('swaps')
         .select('*')
-        .in('status', ['open', 'active'])
+        .in('status', ['open', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -65,7 +65,7 @@ export const swapService = {
         .from('swaps')
         .select('*')
         .eq('category', category)
-        .in('status', ['open', 'active'])
+        .in('status', ['open', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -169,7 +169,7 @@ export const swapService = {
         .from('swaps')
         .select('*')
         .ilike('skill_offered', `%${skill}%`)
-        .eq('status', 'open')
+        .in('status', ['open', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -191,7 +191,7 @@ export const swapService = {
         .from('swaps')
         .select('*')
         .ilike('skill_wanted', `%${skill}%`)
-        .eq('status', 'open')
+        .in('status', ['open', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -214,7 +214,7 @@ export const swapService = {
         .from('swaps')
         .select('*')
         .in('skill_wanted', userSkillsWanted)
-        .eq('status', 'open')
+        .in('status', ['open', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) {

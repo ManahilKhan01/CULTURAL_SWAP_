@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -13,13 +14,31 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email.trim()) {
+      alert("Please enter your email address");
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error("Password reset error:", error);
+        alert(error.message || "Failed to send reset link. Please try again.");
+      } else {
+        setIsSubmitted(true);
+      }
+    } catch (err: any) {
+      console.error("Unexpected error:", err);
+      alert("An unexpected error occurred. Please try again.");
+    } finally {
       setIsLoading(false);
-      setIsSubmitted(true);
-    }, 1500);
+    }
   };
 
   return (

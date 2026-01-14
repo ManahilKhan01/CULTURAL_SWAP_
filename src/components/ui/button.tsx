@@ -9,17 +9,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-warm hover:shadow-warm-lg",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-warm",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        terracotta: "bg-terracotta text-white hover:bg-terracotta-dark shadow-warm hover:shadow-warm-lg",
-        teal: "bg-teal text-white hover:bg-teal-dark shadow-teal hover:shadow-lg",
+        terracotta: "bg-terracotta text-white hover:bg-terracotta-dark shadow-warm",
+        teal: "bg-teal text-white hover:bg-teal-dark shadow-teal",
         golden: "bg-golden text-charcoal hover:bg-golden-dark",
         navy: "bg-navy text-white hover:bg-navy-light",
-        hero: "bg-gradient-to-r from-terracotta to-terracotta-dark text-white hover:from-terracotta-dark hover:to-terracotta shadow-warm-lg hover:shadow-xl",
+        hero: "bg-gradient-to-r from-terracotta to-terracotta-dark text-white hover:from-terracotta-dark hover:to-terracotta shadow-warm-lg",
       },
       size: {
         default: "h-10 px-4 py-2",

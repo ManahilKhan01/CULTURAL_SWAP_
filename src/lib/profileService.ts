@@ -48,7 +48,47 @@ export const profileService = {
     return data?.[0] || null;
   },
 
-  // Update profile image
+  // Upload profile image to storage and update profile
+  async uploadAndUpdateProfileImage(userId: string, imageFile: File) {
+    try {
+      // Create a unique filename
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `profile-images/${userId}/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('user-profiles')
+        .upload(filePath, imageFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('user-profiles')
+        .getPublicUrl(filePath);
+
+      const imageUrl = urlData.publicUrl;
+
+      // Update profile with image URL
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({ profile_image_url: imageUrl })
+        .eq('id', userId)
+        .select();
+
+      if (error) throw error;
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      throw error;
+    }
+  },
+
+  // Update profile image (for URLs only)
   async updateProfileImage(userId: string, imageUrl: string) {
     const { data, error } = await supabase
       .from('user_profiles')

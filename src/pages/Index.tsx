@@ -1,13 +1,31 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Globe, Users, Star, Shield, Sparkles, MessageCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { mockSwaps, mockUsers, skillCategories } from "@/data/mockData";
+import { supabase } from "@/lib/supabase";
 
 const Index = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsLoggedIn(!!user);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
   const features = [
     {
       icon: Sparkles,
@@ -40,7 +58,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isLoggedIn={false} />
+      <Navbar isLoggedIn={isLoggedIn} />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-hero">
@@ -59,14 +77,19 @@ const Index = () => {
               No money needed—just your passion and curiosity.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="hero" size="xl" asChild>
-                <Link to="/signup">
-                  Start Swapping Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="xl" asChild>
-                <Link to="/discover">Explore Skills</Link>
+              <Button 
+                variant="hero" 
+                size="xl"
+                onClick={() => {
+                  if (isLoggedIn) {
+                    navigate("/dashboard");
+                  } else {
+                    navigate("/signup");
+                  }
+                }}
+              >
+                Start Swapping Free
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </div>
@@ -317,17 +340,12 @@ const Index = () => {
             Join thousands of learners exchanging skills and cultures every day. 
             It's free to get started!
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="xl" className="bg-white text-terracotta hover:bg-white/90" asChild>
-              <Link to="/signup">
-                Create Free Account
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-            <Button size="xl" variant="outline" className="border-white text-white hover:bg-white/10" asChild>
-              <Link to="/discover">Browse Skills</Link>
-            </Button>
-          </div>
+          <Button size="xl" className="bg-white text-terracotta hover:bg-white/90" asChild>
+            <Link to="/signup">
+              Create Free Account
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </Button>
         </div>
       </section>
 

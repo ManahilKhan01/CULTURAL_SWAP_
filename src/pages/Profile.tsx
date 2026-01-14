@@ -123,6 +123,33 @@ const Profile = () => {
     loadProfileData();
   }, []);
 
+  // Listen for profile updates
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      console.log("Profile updated event received, refreshing profile...");
+      setLoading(true);
+      const reloadProfileData = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const profile = await profileService.getProfile(user.id);
+            if (profile) {
+              setUserProfile(profile);
+            }
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Error reloading profile:', error);
+          setLoading(false);
+        }
+      };
+      reloadProfileData();
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
+  }, [userProfile]);
+
   if (loading) return <ProfileSkeleton />;
 
   if (!userProfile) {
@@ -148,7 +175,7 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row gap-6 items-start">
             <div className="relative group">
               <img
-                src={userProfile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                src={userProfile.profile_image_url || "/placeholder.svg"}
                 alt={userProfile.full_name}
                 className="h-32 w-32 rounded-2xl object-cover border-4 border-white shadow-warm transition-transform duration-500 group-hover:scale-105"
               />

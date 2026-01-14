@@ -142,12 +142,12 @@ export const CreateOfferDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Create Swap Offer</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6 max-h-[70vh] overflow-y-auto px-1">
+                <div className="space-y-6 overflow-y-auto flex-1 px-6 -mx-6 pr-4">
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div className="space-y-2">

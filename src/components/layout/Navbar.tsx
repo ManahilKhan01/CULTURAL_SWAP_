@@ -184,6 +184,18 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
 
   const isActive = (href: string) => location.pathname === href;
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Clear localStorage cache
+      localStorage.removeItem('navbar_profile_cache');
+      // Redirect to landing page
+      navigate('/');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
@@ -269,7 +281,7 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                           >
                             <div className="flex items-start gap-3 w-full">
                               <img
-                                src={senderProfile?.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                                src={senderProfile?.profile_image_url || "/placeholder.svg"}
                                 alt="Sender"
                                 className="h-10 w-10 rounded-full object-cover flex-shrink-0"
                               />
@@ -298,7 +310,7 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2 pl-2 pr-3">
                       <img
-                        src={userImage || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                        src={userImage || "/placeholder.svg"}
                         alt={userName}
                         className="h-8 w-8 rounded-full object-cover"
                       />
@@ -323,17 +335,16 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to="/login" className="gap-2 text-destructive">
-                        <LogOut className="h-4 w-4" />
-                        Log Out
-                      </Link>
+                    <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive cursor-pointer">
+                      <LogOut className="h-4 w-4" />
+                      Log Out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
             ) : (
               <>
+                {/* Login/Signup buttons shown when user is not logged in */}
                 <Button variant="ghost" asChild>
                   <Link to="/login">Log In</Link>
                 </Button>
@@ -386,10 +397,15 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                           My Profile
                         </Link>
                       </Button>
-                      <Button variant="ghost" asChild className="w-full text-destructive">
-                        <Link to="/login" onClick={() => setIsOpen(false)}>
-                          Log Out
-                        </Link>
+                      <Button 
+                        variant="ghost" 
+                        className="w-full text-destructive"
+                        onClick={() => {
+                          setIsOpen(false);
+                          handleLogout();
+                        }}
+                      >
+                        Log Out
                       </Button>
                     </div>
                   ) : (

@@ -65,105 +65,7 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Main Footer */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-terracotta to-teal">
-                <span className="text-lg font-bold text-white">C</span>
-              </div>
-              <span className="font-display text-xl font-semibold">
-                CultureSwap
-              </span>
-            </Link>
-            <p className="text-white/70 text-sm mb-6">
-              Exchange skills, share cultures, and connect with learners worldwide.
-            </p>
-            <div className="flex gap-3">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="h-9 w-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-terracotta transition-colors"
-                >
-                  <social.icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Platform Links */}
-          <div>
-            <h4 className="font-semibold mb-4">Platform</h4>
-            <ul className="space-y-3">
-              {footerLinks.platform.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-white/70 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support Links */}
-          <div>
-            <h4 className="font-semibold mb-4">Support</h4>
-            <ul className="space-y-3">
-              {footerLinks.support.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-white/70 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal Links */}
-          <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
-            <ul className="space-y-3">
-              {footerLinks.legal.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-white/70 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company Links */}
-          <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.href}
-                    className="text-sm text-white/70 hover:text-white transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+     
 
       {/* Bottom Bar */}
       <div className="border-t border-white/10">
@@ -171,7 +73,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/60">
             <p>© {new Date().getFullYear()} CultureSwap. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <span>Made with ❤️ for cultural exchange</span>
+              <span>Made for cultural exchange</span>
             </div>
           </div>
         </div>

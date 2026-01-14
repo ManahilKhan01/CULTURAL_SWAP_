@@ -354,7 +354,7 @@ const Discover = () => {
                   <div className="flex items-start gap-4 mb-4">
                     {profile ? (
                       <img
-                        src={profile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                        src={profile.profile_image_url || "/placeholder.svg"}
                         alt={profile.full_name || "User"}
                         className="h-12 w-12 rounded-full object-cover border-2 border-white shadow-sm transition-opacity duration-300"
                       />
@@ -376,7 +376,12 @@ const Discover = () => {
                     </div>
                   </div>
 
-                  <h3 className="font-display text-lg font-semibold mb-2 group-hover:text-terracotta transition-colors">{swap.title}</h3>
+                  <h3 className="font-display text-lg font-semibold mb-2 group-hover:text-terracotta transition-colors flex items-center gap-2">
+                    {swap.title}
+                    {swap.status === 'cancelled' && (
+                      <Badge className="bg-red-500/20 text-red-600 border-red-500/30 text-xs font-semibold">Cancelled</Badge>
+                    )}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2 leading-relaxed">
                     {swap.description || "No description provided"}
                   </p>
@@ -413,7 +418,7 @@ const Discover = () => {
                       className="bg-terracotta hover:bg-terracotta-dark text-white transition-all hover-lift active:scale-95"
                       asChild
                     >
-                      <Link to={`/swap/${swap.id}`}>
+                      <Link to={`/swap/${swap.id}?source=discover`}>
                         View
                         <ArrowRight className="ml-1 h-4 w-4" />
                       </Link>

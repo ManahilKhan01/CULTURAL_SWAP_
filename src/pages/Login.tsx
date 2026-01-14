@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +130,14 @@ const Login = () => {
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+              </div>
+              <div className="text-right">
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-blue-600 hover:underline font-medium"
+                >
+                  Forgot Password?
+                </Link>
               </div>
             </div>
 

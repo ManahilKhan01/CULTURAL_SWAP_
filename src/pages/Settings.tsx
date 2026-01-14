@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, User, Bell, Shield, Globe, Palette, Save, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,10 +16,12 @@ import { supabase } from "@/lib/supabase";
 import { profileService } from "@/lib/profileService";
 
 const Settings = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [profileImage, setProfileImage] = useState<string>("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [timezones, setTimezones] = useState<any[]>([]);
   const [profile, setProfile] = useState({
     name: "",
@@ -60,10 +62,10 @@ const Settings = () => {
               availability: userProfile.availability || "",
               languages: userProfile.languages?.join(", ") || "",
               skillsOffered: userProfile.skills_offered?.join(", ") || "",
-              skillsWanted: userProfile.skills_wanted?.join(", "),
+              skillsWanted: userProfile.skills_wanted?.join(", ") || "",
             };
             setProfile(profileData);
-            setProfileImage(userProfile.profile_image_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop");
+            setProfileImage(userProfile.profile_image_url || "/placeholder.svg");
 
             // Cache profile for faster next load
             localStorage.setItem('settings_profile_cache', JSON.stringify({
@@ -95,7 +97,7 @@ const Settings = () => {
       try {
         const { profile: cachedProfile, image } = JSON.parse(cached);
         setProfile(cachedProfile);
-        setProfileImage(image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop");
+        setProfileImage(image || "/placeholder.svg");
       } catch {
         // Ignore cache errors
       }
@@ -109,78 +111,181 @@ const Settings = () => {
     if (!file) return;
 
     try {
-      // Create a simple data URL (preview)
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const imageUrl = reader.result as string;
-        // Just update state, don't save yet
-        setProfileImage(imageUrl);
-        toast({
-          title: "Photo Selected",
-          description: "Click 'Save Changes' to confirm the new photo.",
-        });
+      reader.onload = async (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Store the original file
+          setImageFile(file);
+          
+          // Create canvas for preview
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimensions
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Get preview image for display
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          setProfileImage(dataUrl);
+
+          toast({
+            title: "Photo Selected",
+            description: "Click 'Save Changes' to confirm settings.",
+          });
+        };
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     } catch (err: any) {
-      console.error("Error loading image:", err);
+      console.error("Error processing image:", err);
       toast({
         title: "Error",
-        description: "Failed to load image",
+        description: "Failed to process image",
         variant: "destructive",
       });
     }
   };
 
-  const handleProfileSave = async () => {
-    setIsLoading(true);
+  const handleFileUpload = async (file: File) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const updates = {
-        full_name: profile.name,
-        bio: profile.bio,
-        city: profile.city,
-        country: profile.country,
-        timezone: profile.timezone,
-        availability: profile.availability,
-        profile_image_url: profileImage,
-        languages: profile.languages.split(",").map(l => l.trim()).filter(l => l),
-        skills_offered: profile.skillsOffered.split(",").map(s => s.trim()).filter(s => s),
-        skills_wanted: profile.skillsWanted.split(",").map(s => s.trim()).filter(s => s),
-      };
-
-      // Check if profile exists
-      const existing = await profileService.getProfile(user.id);
-
-      if (existing) {
-        // Update existing profile
-        await profileService.updateProfile(user.id, updates);
-      } else {
-        // Create new profile
-        await profileService.createProfile(user.id, user.email || "", profile.name, updates);
+      if (!user) {
+        throw new Error("Not authenticated");
       }
 
-      // Update user metadata in Supabase Auth
-      await supabase.auth.updateUser({
-        data: {
-          full_name: profile.name,
-          avatar_url: profileImage
-        }
+      // Upload the file directly
+      await profileService.uploadAndUpdateProfileImage(user.id, file);
+      toast({
+        title: "Photo Uploaded",
+        description: "Profile photo has been updated successfully.",
       });
+    } catch (err: any) {
+      console.error("Error uploading image:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to upload image",
+        variant: "destructive",
+      });
+    }
+  };
 
-      // User metadata is already updated via supabase.auth.updateUser above
-      // Supabase automatically syncs this to its session storage
+  const testConnectivity = async () => {
+    try {
+      console.log("DEBUG - Testing Supabase connectivity...");
+      const { data, error } = await supabase.from('timezones').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      alert("Connectivity Test: SUCCESS! Connected to Supabase.");
+    } catch (err: any) {
+      console.error("DEBUG - Connectivity Test FAILED:", err);
+      alert("Connectivity Test: FAILED! " + err.message);
+    }
+  };
+
+  const handleProfileSave = async (skipImage: boolean = false) => {
+    console.log(`DEBUG - handleProfileSave triggered (skipImage: ${skipImage})`);
+    setIsLoading(true);
+    try {
+      // Get current user with proper error handling
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error("DEBUG - Auth Error:", userError);
+        toast({
+          title: "Authentication Error",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+
+      console.log("DEBUG - User authenticated:", user.id);
+
+      const updates: any = {
+        full_name: profile.name || "",
+        bio: profile.bio || "",
+        city: profile.city || "",
+        country: profile.country || "",
+        timezone: profile.timezone || "",
+        availability: profile.availability || "",
+        languages: (profile.languages || "").split(",").map(l => l.trim()).filter(l => l),
+        skills_offered: (profile.skillsOffered || "").split(",").map(s => s.trim()).filter(s => s),
+        skills_wanted: (profile.skillsWanted || "").split(",").map(s => s.trim()).filter(s => s),
+      };
+
+      // Handle image upload if not skipped
+      if (!skipImage && imageFile) {
+        console.log("DEBUG - Uploading image file...");
+        try {
+          await profileService.uploadAndUpdateProfileImage(user.id, imageFile);
+          console.log("DEBUG - Image uploaded successfully");
+        } catch (imgError) {
+          console.error("DEBUG - Image upload error:", imgError);
+          // Continue without image update
+          toast({
+            title: "Warning",
+            description: "Profile updated but image upload failed. You can try again later.",
+            variant: "default",
+          });
+        }
+      }
+
+      console.log("DEBUG - Starting database update (upsert)...");
+      const { error: upsertErr } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          ...updates,
+          updated_at: new Date().toISOString()
+        });
+
+      if (upsertErr) {
+        console.error("DEBUG - Upsert error:", upsertErr);
+        throw upsertErr;
+      }
+
+      console.log("DEBUG - Update successful");
 
       // Trigger navbar refresh by dispatching event
       window.dispatchEvent(new Event('profileUpdated'));
 
+      // Clear related caches
+      localStorage.removeItem('settings_profile_cache');
+      localStorage.removeItem('profile_page_cache');
+      localStorage.removeItem('navbar_profile_cache');
+
       toast({
         title: "Profile Updated",
-        description: "Your profile has been saved successfully.",
+        description: skipImage ? "Profile saved (image skipped)." : "Profile saved successfully.",
       });
+
+      // Redirect to dashboard after successful update
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
     } catch (err: any) {
-      console.error("Error saving profile:", err);
+      console.error("DEBUG - Profile Save Error:", err);
       toast({
         title: "Error",
         description: err.message || "Failed to save profile",
@@ -227,7 +332,7 @@ const Settings = () => {
                 {/* Avatar */}
                 <div className="flex items-center gap-4">
                   <img
-                    src={profileImage || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop"}
+                    src={profileImage || "/placeholder.svg"}
                     alt={profile.name}
                     className="h-20 w-20 rounded-full object-cover border-2 border-border"
                   />
@@ -305,7 +410,18 @@ const Settings = () => {
                   <Textarea id="skillsWanted" rows={2} value={profile.skillsWanted} onChange={(e) => setProfile({ ...profile, skillsWanted: e.target.value })} placeholder="Photography, Cooking, Graphic Design" />
                 </div>
 
-                <Button variant="terracotta" onClick={handleProfileSave} disabled={isLoading}><Save className="h-4 w-4 mr-2" />{isLoading ? "Saving..." : "Save Changes"}</Button>
+                <div className="flex flex-wrap gap-4 pt-4 border-t border-border mt-6">
+                  <Button variant="terracotta" onClick={() => handleProfileSave(false)} disabled={isLoading}><Save className="h-4 w-4 mr-2" />{isLoading ? "Saving..." : "Save Changes"}</Button>
+
+                  <div className="flex gap-2 ml-auto">
+                    <Button variant="outline" size="sm" onClick={testConnectivity}>
+                      Test Connectivity
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleProfileSave(true)} disabled={isLoading}>
+                      Save (No Image)
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
