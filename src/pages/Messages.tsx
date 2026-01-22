@@ -18,6 +18,7 @@ import { OfferCard } from "@/components/OfferCard";
 import { chatManagementService } from "@/lib/chatManagementService";
 import { aiAssistantService } from "@/lib/aiAssistantService";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
+import { getCacheBustedImageUrl } from "@/lib/cacheUtils";
 
 const Messages = () => {
   const [searchParams] = useSearchParams();
@@ -65,6 +66,10 @@ const Messages = () => {
     const markAsRead = async () => {
       try {
         await markConversationAsRead(selectedConversation.id);
+        // Reload conversations to update the list (removes from unread filter)
+        if (currentUser?.id) {
+          await loadConversations(currentUser.id);
+        }
       } catch (error) {
         console.error('Error marking messages as read:', error);
         // Non-blocking error - don't show toast as it can be distracting
@@ -182,7 +187,7 @@ const Messages = () => {
       }
 
       setMenuOpenId(null);
-      
+
       try {
         // Get assistant profile
         const assistant = await aiAssistantService.getOrCreateAssistantUser();
@@ -191,11 +196,11 @@ const Messages = () => {
         // Get or create assistant conversation (returns virtual ID)
         const conversationId = await aiAssistantService.getOrCreateAssistantConversation(currentUser.id);
         console.log('Conversation ID:', conversationId);
-        
+
         // For assistant chat, try to load from messages between user and assistant
         // If conversation ID is virtual (starts with "assistant-conv-"), query by users instead
         let convMessages: any[] = [];
-        
+
         if (conversationId.startsWith('assistant-conv-')) {
           // Use message-based lookup (avoids conversations table entirely)
           console.log('Loading messages via message-based fallback');
@@ -214,7 +219,7 @@ const Messages = () => {
             convMessages = await messageService.getConversation(currentUser.id, assistant.id);
           }
         }
-        
+
         console.log('Messages loaded:', convMessages.length);
 
         // Load attachments
@@ -261,10 +266,10 @@ const Messages = () => {
       }
     } catch (error: any) {
       console.error('Error opening assistant chat:', error);
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to open assistant chat. Please check console for details.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to open assistant chat. Please check console for details.",
+        variant: "destructive"
       });
     }
   };
@@ -283,7 +288,7 @@ const Messages = () => {
       }
       setUserProfiles(profiles);
       setConversations(allConversations);
-      
+
       // Load chat metadata (starred and archived)
       if (uId) {
         const metadata = await chatManagementService.getAllChatMetadata(uId);
@@ -512,7 +517,7 @@ const Messages = () => {
 
     try {
       setSending(true);
-      
+
       // Check if this is an assistant conversation (uses virtual ID)
       const isAssistantChat = aiAssistantService.isAssistantConversation(selectedConversation.id);
 
@@ -529,7 +534,7 @@ const Messages = () => {
           created_at: new Date().toISOString(),
           is_read: true,
         };
-        
+
         setMessages(prev => [...prev, newMessage]);
         console.log('Created local assistant message:', newMessage);
       } else {
@@ -603,7 +608,7 @@ const Messages = () => {
           try {
             // Generate AI response
             const aiResponse = await aiAssistantService.generateResponse(messageText.trim(), messages);
-            
+
             // Create a virtual assistant message for display
             const assistantMessage = {
               id: `assistant-${Date.now()}-${Math.random()}`,
@@ -717,9 +722,9 @@ const Messages = () => {
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold font-display">Messages</h2>
                   <div className="relative">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="rounded-full"
                       onClick={() => setMenuOpenId(menuOpenId ? null : 'menu')}
                     >
@@ -809,6 +814,43 @@ const Messages = () => {
                     className="pl-9 bg-background/50 border-muted focus-visible:ring-terracotta"
                   />
                 </div>
+                {/* Filter Indicator */}
+                {activeFilter !== 'all' && (
+                  <div className="px-4 py-2 bg-terracotta/5 border-b border-border">
+                    <div className="flex items-center gap-2 text-sm">
+                      {activeFilter === 'starred' && (
+                        <>
+                          <Star className="h-4 w-4 text-terracotta fill-terracotta" />
+                          <span className="text-terracotta font-medium">Starred Chats</span>
+                        </>
+                      )}
+                      {activeFilter === 'archived' && (
+                        <>
+                          <Archive className="h-4 w-4 text-terracotta" />
+                          <span className="text-terracotta font-medium">Archived Chats</span>
+                        </>
+                      )}
+                      {activeFilter === 'unread' && (
+                        <>
+                          <Bell className="h-4 w-4 text-terracotta" />
+                          <span className="text-terracotta font-medium">Unread Messages</span>
+                        </>
+                      )}
+                      {activeFilter === 'offers' && (
+                        <>
+                          <Handshake className="h-4 w-4 text-terracotta" />
+                          <span className="text-terracotta font-medium">Custom Offers</span>
+                        </>
+                      )}
+                      {activeFilter === 'assistant' && (
+                        <>
+                          <MessageCircle className="h-4 w-4 text-terracotta" />
+                          <span className="text-terracotta font-medium">Assistant Chats</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-auto">
@@ -837,7 +879,8 @@ const Messages = () => {
                         >
                           <div className="relative flex-shrink-0">
                             <img
-                              src={profile?.profile_image_url || "/download.png"}
+                              key={getCacheBustedImageUrl(profile?.profile_image_url)}
+                              src={getCacheBustedImageUrl(profile?.profile_image_url)}
                               alt="Avatar"
                               className={`h-12 w-12 rounded-full object-cover ring-2 shadow-sm ${isAssistant ? 'ring-blue-400 bg-blue-100' : 'ring-background'}`}
                             />
@@ -909,11 +952,10 @@ const Messages = () => {
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className={`p-3 px-4 md:p-4 border-b border-border flex items-center justify-between sticky top-0 backdrop-blur-sm z-10 ${
-                    isAssistantUser(otherUserProfile) 
-                      ? 'bg-gradient-to-r from-blue-50 to-blue-100/50 border-blue-200' 
-                      : 'bg-white/40'
-                  }`}>
+                  <div className={`p-3 px-4 md:p-4 border-b border-border flex items-center justify-between sticky top-0 backdrop-blur-sm z-10 ${isAssistantUser(otherUserProfile)
+                    ? 'bg-gradient-to-r from-blue-50 to-blue-100/50 border-blue-200'
+                    : 'bg-white/40'
+                    }`}>
                     <div className="flex items-center gap-3">
                       <Button
                         variant="ghost"
@@ -925,11 +967,11 @@ const Messages = () => {
                       </Button>
                       <div className="relative">
                         <img
-                          src={otherUserProfile?.profile_image_url || "/download.png"}
+                          key={getCacheBustedImageUrl(otherUserProfile?.profile_image_url)}
+                          src={getCacheBustedImageUrl(otherUserProfile?.profile_image_url)}
                           alt="Avatar"
-                          className={`h-10 w-10 rounded-full object-cover shadow-sm ring-1 ${
-                            isAssistantUser(otherUserProfile) ? 'ring-blue-400 bg-blue-100' : 'ring-border'
-                          }`}
+                          className={`h-10 w-10 rounded-full object-cover shadow-sm ring-1 ${isAssistantUser(otherUserProfile) ? 'ring-blue-400 bg-blue-100' : 'ring-border'
+                            }`}
                         />
                         {isAssistantUser(otherUserProfile) ? (
                           <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 border-2 border-white text-[10px] flex items-center justify-center text-white font-bold">✨</div>

@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { profileService } from "@/lib/profileService";
 import { reviewService } from "@/lib/reviewService";
 import { swapService } from "@/lib/swapService";
+import { getCacheBustedImageUrl } from "@/lib/cacheUtils";
 
 const ProfileSkeleton = () => (
   <div className="min-h-screen bg-background animate-pulse">
@@ -175,7 +176,8 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row gap-6 items-start">
             <div className="relative group">
               <img
-                src={userProfile.profile_image_url || "/download.png"}
+                key={getCacheBustedImageUrl(userProfile.profile_image_url)}
+                src={getCacheBustedImageUrl(userProfile.profile_image_url)}
                 alt={userProfile.full_name}
                 className="h-32 w-32 rounded-2xl object-cover border-4 border-white shadow-warm transition-transform duration-500 group-hover:scale-105"
               />

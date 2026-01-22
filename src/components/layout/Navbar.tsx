@@ -19,6 +19,7 @@ import { messageService } from "@/lib/messageService";
 import { profileService } from "@/lib/profileService";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { useProfileUpdates } from "@/hooks/useProfileUpdates";
+import { getCacheBustedImageUrl } from "@/lib/cacheUtils";
 
 interface NavbarProps {
   isLoggedIn?: boolean;
@@ -40,18 +41,22 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [senderProfiles, setSenderProfiles] = useState<Record<string, any>>({});
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversationProfiles, setConversationProfiles] = useState<Record<string, any>>({});
+  const [loadingConvs, setLoadingConvs] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   // Use the new unread messages hook for accurate real-time tracking
-  const { total: unreadMessages } = useUnreadMessages(currentUser?.id || null);
+  const { total: unreadMessages, markConversationAsRead } = useUnreadMessages(currentUser?.id || null);
 
   // Use real-time profile updates hook
   const { profile } = useProfileUpdates(currentUser?.id || null);
 
   // Compute display values from real-time profile or cache
-  const userName = profile?.full_name || currentUser?.email?.split('@')[0] || "User";
+  const userName = profile?.full_name?.split(' ')[0] || currentUser?.email?.split('@')[0] || "User";
   const userImage = profile?.profile_image_url || null;
+  const userImageUrl = getCacheBustedImageUrl(userImage);
 
   // Listen for profile updates event from other components
   useEffect(() => {
@@ -107,6 +112,37 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
       loadUser();
     }
   }, [isLoggedIn]);
+
+  // Handle subscriptions separately once currentUser is available
+  // Load conversations for message dropdown
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.id) return;
+
+    const loadConversations = async () => {
+      try {
+        setLoadingConvs(true);
+        const convs = await messageService.getConversations(currentUser.id);
+
+        // Load profiles for each conversation
+        const profiles: Record<string, any> = {};
+        for (const conv of convs) {
+          if (conv.otherUserId && !profiles[conv.otherUserId]) {
+            const profile = await profileService.getProfile(conv.otherUserId);
+            profiles[conv.otherUserId] = profile;
+          }
+        }
+
+        setConversations(convs.slice(0, 7)); // Show max 7 conversations
+        setConversationProfiles(profiles);
+      } catch (error) {
+        console.error('Error loading conversations:', error);
+      } finally {
+        setLoadingConvs(false);
+      }
+    };
+
+    loadConversations();
+  }, [isLoggedIn, currentUser?.id, unreadMessages]); // Reload when unread count changes
 
   // Handle subscriptions separately once currentUser is available
   useEffect(() => {
@@ -173,14 +209,11 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="/logo.svg" 
-              alt="CultureSwap Logo" 
-              className="h-9 w-9 object-contain"
+            <img
+              src="/logo.svg"
+              alt="CultureSwap Logo"
+              className="h-14 w-14 object-contain"
             />
-            <span className="font-display text-xl font-semibold text-foreground">
-              CultureSwap
-            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -204,17 +237,90 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
           <div className="hidden md:flex items-center gap-2">
             {isLoggedIn ? (
               <>
-                {/* Messages */}
-                <Button variant="ghost" size="icon" asChild className="relative">
-                  <Link to="/messages">
-                    <MessageCircle className="h-5 w-5" />
-                    {unreadMessages > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center bg-terracotta text-white text-[10px]">
-                        {unreadMessages > 9 ? '9+' : unreadMessages}
-                      </Badge>
+                {/* Messages Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                      <MessageCircle className="h-5 w-5" />
+                      {unreadMessages > 0 && (
+                        <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center bg-terracotta text-white text-[10px]">
+                          {unreadMessages > 9 ? '9+' : unreadMessages}
+                        </Badge>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80">
+                    <div className="p-3 border-b border-border">
+                      <h4 className="font-semibold">Messages</h4>
+                    </div>
+                    {loadingConvs ? (
+                      <div className="p-4 text-center text-muted-foreground text-sm">
+                        Loading conversations...
+                      </div>
+                    ) : conversations.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground text-sm">
+                        No conversations yet
+                      </div>
+                    ) : (
+                      <>
+                        {conversations.map((conv) => {
+                          const profile = conversationProfiles[conv.otherUserId];
+                          const isUnread = conv.lastMessage?.receiver_id === currentUser?.id && !conv.lastMessage?.is_read;
+
+                          return (
+                            <DropdownMenuItem
+                              key={conv.id}
+                              className="p-3 cursor-pointer hover:bg-muted"
+                              onClick={async () => {
+                                // Mark conversation as read if it's unread
+                                if (isUnread && conv.id) {
+                                  try {
+                                    await markConversationAsRead(conv.id);
+                                  } catch (error) {
+                                    console.error('Error marking conversation as read:', error);
+                                  }
+                                }
+                                navigate(`/messages?user=${conv.otherUserId}`);
+                              }}
+                            >
+                              <div className="flex items-start gap-3 w-full">
+                                <img
+                                  src={getCacheBustedImageUrl(profile?.profile_image_url)}
+                                  alt="User"
+                                  className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className={`font-medium text-sm truncate ${isUnread ? 'font-bold' : ''}`}>
+                                      {profile?.full_name || 'User'}
+                                    </p>
+                                    <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-2">
+                                      {new Date(conv.lastMessage?.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {isUnread && (
+                                      <div className="h-2 w-2 rounded-full bg-terracotta flex-shrink-0" />
+                                    )}
+                                    <p className={`text-xs truncate ${isUnread ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                                      {conv.lastMessage?.content || 'No messages yet'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link to="/messages" className="w-full text-center text-sm font-medium text-terracotta hover:text-terracotta/80 cursor-pointer">
+                            View All Messages
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
                     )}
-                  </Link>
-                </Button>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {/* Notifications */}
                 <DropdownMenu>
@@ -254,7 +360,7 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                           >
                             <div className="flex items-start gap-3 w-full">
                               <img
-                                src={senderProfile?.profile_image_url || "/download.png"}
+                                src={getCacheBustedImageUrl(senderProfile?.profile_image_url)}
                                 alt="Sender"
                                 className="h-10 w-10 rounded-full object-cover flex-shrink-0"
                               />
@@ -283,7 +389,8 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2 pl-2 pr-3">
                       <img
-                        src={userImage || "/download.png"}
+                        key={userImageUrl}
+                        src={userImageUrl}
                         alt={userName}
                         className="h-8 w-8 rounded-full object-cover"
                       />
@@ -370,8 +477,8 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
                           My Profile
                         </Link>
                       </Button>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         className="w-full text-destructive"
                         onClick={() => {
                           setIsOpen(false);

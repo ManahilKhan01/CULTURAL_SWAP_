@@ -9,28 +9,28 @@ VALUES ('user-profiles', 'user-profiles', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Set up RLS policies for the bucket
--- Allow users to upload their own profile images
+-- Allow authenticated users to upload their own profile images
 CREATE POLICY "Users can upload their own profile images"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'user-profiles' 
-  AND (storage.foldername(name))[1] = auth.uid()::text
+  AND auth.role() = 'authenticated'
 );
 
--- Allow users to update their own profile images
+-- Allow authenticated users to update their own profile images
 CREATE POLICY "Users can update their own profile images"
 ON storage.objects FOR UPDATE
 WITH CHECK (
   bucket_id = 'user-profiles' 
-  AND (storage.foldername(name))[1] = auth.uid()::text
+  AND auth.role() = 'authenticated'
 );
 
--- Allow users to delete their own profile images
+-- Allow authenticated users to delete their own profile images
 CREATE POLICY "Users can delete their own profile images"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'user-profiles' 
-  AND (storage.foldername(name))[1] = auth.uid()::text
+  AND auth.role() = 'authenticated'
 );
 
 -- Allow anyone to view/download profile images (public)

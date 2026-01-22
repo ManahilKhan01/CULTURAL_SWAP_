@@ -45,13 +45,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-    
+
     // Listen for profile updates from other pages
     const handleProfileUpdate = () => {
       console.log("Profile updated event received, refreshing dashboard...");
       fetchDashboardData();
     };
-    
+
     window.addEventListener('profileUpdated', handleProfileUpdate);
     return () => window.removeEventListener('profileUpdated', handleProfileUpdate);
   }, []);
@@ -321,40 +321,6 @@ const Dashboard = () => {
                   <Button variant="outline" className="w-full" asChild>
                     <Link to="/profile">Complete Profile</Link>
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display text-lg">Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {notifications.length > 0 ? (
-                    notifications.map((notification) => (
-                      <div key={notification.id} className="flex gap-3">
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${notification.read ? 'bg-muted' : 'bg-terracotta/10'
-                          }`}>
-                          {notification.type === 'new_offer' && <Award className="h-4 w-4 text-terracotta" />}
-                          {notification.type === 'message' && <MessageCircle className="h-4 w-4 text-teal" />}
-                          {notification.type === 'offer_accepted' && <Star className="h-4 w-4 text-golden" />}
-                          {notification.type === 'offer_rejected' && <Clock className="h-4 w-4 text-muted-foreground" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`text-sm ${notification.read ? 'text-muted-foreground' : 'font-medium'}`}>
-                            {notification.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {notification.body}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-center italic text-muted-foreground">No recent activity</p>
-                  )}
                 </div>
               </CardContent>
             </Card>

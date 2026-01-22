@@ -15,7 +15,7 @@ import Footer from "@/components/layout/Footer";
 import { supabase } from "@/lib/supabase";
 import { profileService } from "@/lib/profileService";
 import { SkillsMultiSelect } from "@/components/SkillsMultiSelect";
-import { clearProfileCaches, dispatchProfileUpdate } from "@/lib/cacheUtils";
+import { clearProfileCaches, dispatchProfileUpdate, getCacheBustedImageUrl } from "@/lib/cacheUtils";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -130,7 +130,7 @@ const Settings = () => {
         img.onload = () => {
           // Store the original file
           setImageFile(file);
-          
+
           // Create canvas for preview
           const canvas = document.createElement('canvas');
           let width = img.width;
@@ -220,7 +220,7 @@ const Settings = () => {
     try {
       // Get current user with proper error handling
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (userError || !user) {
         console.error("DEBUG - Auth Error:", userError);
         toast({
@@ -240,7 +240,7 @@ const Settings = () => {
         try {
           const uploadedProfile = await profileService.uploadAndUpdateProfileImage(user.id, imageFile);
           console.log("DEBUG - Image uploaded successfully:", uploadedProfile);
-          
+
           // Image is already updated in the database via uploadAndUpdateProfileImage
           // Clear the imageFile so we don't try to upload it again
           setImageFile(null);

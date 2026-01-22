@@ -51,6 +51,35 @@ export const profileService = {
   // Upload profile image to storage and update profile
   async uploadAndUpdateProfileImage(userId: string, imageFile: File) {
     try {
+      // Get current profile to check for existing image
+      const currentProfile = await this.getProfile(userId);
+      const oldImageUrl = currentProfile?.profile_image_url;
+
+      // Delete old image if it exists and is not the default placeholder
+      if (oldImageUrl && !oldImageUrl.includes('/download.png')) {
+        try {
+          // Extract the file path from the URL
+          const urlParts = oldImageUrl.split('/profile-images/');
+          if (urlParts.length > 1) {
+            const oldFilePath = `profile-images/${urlParts[1].split('?')[0]}`; // Remove query params
+
+            const { error: deleteError } = await supabase.storage
+              .from('user-profiles')
+              .remove([oldFilePath]);
+
+            if (deleteError) {
+              console.warn('Failed to delete old profile image:', deleteError);
+              // Continue with upload even if deletion fails
+            } else {
+              console.log('Old profile image deleted successfully');
+            }
+          }
+        } catch (deleteErr) {
+          console.warn('Error deleting old image:', deleteErr);
+          // Continue with upload even if deletion fails
+        }
+      }
+
       // Create a unique filename
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
@@ -61,7 +90,7 @@ export const profileService = {
         .from('user-profiles')
         .upload(filePath, imageFile, {
           cacheControl: '3600',
-          upsert: true
+          upsert: false // Don't upsert, we want unique files
         });
 
       if (uploadError) throw uploadError;
@@ -71,16 +100,29 @@ export const profileService = {
         .from('user-profiles')
         .getPublicUrl(filePath);
 
-      const imageUrl = urlData.publicUrl;
+      // Add cache-busting timestamp to URL
+      const timestamp = Date.now();
+      const imageUrl = `${urlData.publicUrl}?v=${timestamp}`;
 
       // Update profile with image URL
       const { data, error } = await supabase
         .from('user_profiles')
-        .update({ profile_image_url: imageUrl })
+        .update({
+          profile_image_url: imageUrl,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId)
         .select();
 
       if (error) throw error;
+
+      // Dispatch profile update event for real-time UI updates
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('profileUpdated', {
+          detail: data?.[0]
+        }));
+      }
+
       return data?.[0] || null;
     } catch (error) {
       console.error('Error uploading profile image:', error);

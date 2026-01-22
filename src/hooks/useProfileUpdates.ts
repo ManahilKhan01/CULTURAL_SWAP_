@@ -72,11 +72,36 @@ export const useProfileUpdates = (userId: string | null) => {
         },
         (payload) => {
           console.log('Profile update received:', payload);
-          
+
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            const newProfile = payload.new as ProfileData;
+            const oldProfile = payload.old as ProfileData;
+
+            // Check if profile image changed
+            if (newProfile.profile_image_url !== oldProfile?.profile_image_url) {
+              console.log('Profile image changed, invalidating cache');
+
+              // Clear image cache to force reload
+              try {
+                if (newProfile.profile_image_url) {
+                  // Force reload all images with this URL
+                  const images = document.querySelectorAll('img');
+                  images.forEach((img) => {
+                    if (img.src.includes(newProfile.profile_image_url!.split('?')[0])) {
+                      const newSrc = newProfile.profile_image_url!;
+                      img.src = '';
+                      setTimeout(() => { img.src = newSrc; }, 0);
+                    }
+                  });
+                }
+              } catch (e) {
+                console.warn('Error invalidating image cache:', e);
+              }
+            }
+
             // Update local state with new data
-            setProfile(payload.new as ProfileData);
-            
+            setProfile(newProfile);
+
             // Clear related caches
             try {
               localStorage.removeItem('navbar_profile_cache');
@@ -85,10 +110,10 @@ export const useProfileUpdates = (userId: string | null) => {
             } catch (e) {
               console.warn('Error clearing cache:', e);
             }
-            
+
             // Dispatch event for other components
-            window.dispatchEvent(new CustomEvent('profileUpdated', { 
-              detail: payload.new 
+            window.dispatchEvent(new CustomEvent('profileUpdated', {
+              detail: payload.new
             }));
           } else if (payload.eventType === 'DELETE') {
             setProfile(null);
