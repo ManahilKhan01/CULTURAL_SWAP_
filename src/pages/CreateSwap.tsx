@@ -8,8 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 import { swapService } from "@/lib/swapService";
 import { supabase } from "@/lib/supabase";
 import { skillCategories } from "@/data/mockData";
@@ -181,12 +179,10 @@ const CreateSwap = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navbar isLoggedIn={true} />
-
-      <main className="flex-1 container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-8">
         {/* Progress Header */}
-        <div className="max-w-3xl mx-auto mb-10">
+        <div className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => navigate("/swaps")}
@@ -202,7 +198,7 @@ const CreateSwap = () => {
 
           <div className="space-y-2">
             <Progress value={(currentStep / totalSteps) * 100} className="h-2" />
-            <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
+            <div className="flex justify-between text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1 font-display">
               <span className={currentStep >= 1 ? "text-primary" : ""}>Define</span>
               <span className={currentStep >= 2 ? "text-primary" : ""}>Detail</span>
               <span className={currentStep >= 3 ? "text-primary" : ""}>Logistics</span>
@@ -211,7 +207,7 @@ const CreateSwap = () => {
           </div>
         </div>
 
-        <div className="max-w-3xl mx-auto">
+        <div>
           {/* Step 1: Define Your Swap */}
           {currentStep === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -228,7 +224,7 @@ const CreateSwap = () => {
               <Card className="border-2 border-warm-cream">
                 <CardContent className="pt-6 space-y-8">
                   <div className="space-y-3">
-                    <Label htmlFor="title" className="text-base font-bold flex items-center gap-2">
+                    <Label htmlFor="title" className="text-base font-semibold flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-golden" />
                       Swap Title *
                     </Label>
@@ -241,13 +237,13 @@ const CreateSwap = () => {
                       className="h-12 text-lg border-muted hover:border-primary/30 focus:border-primary transition-all"
                     />
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-bold text-terracotta">Tip:</span> Use a catchy title that explains both skills clearly.
+                      <span className="font-semibold text-terracotta">Tip:</span> Use a catchy title that explains both skills clearly.
                     </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label htmlFor="skill_offered" className="text-base font-bold flex items-center gap-2">
+                      <Label htmlFor="skill_offered" className="text-base font-semibold flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full bg-teal/10 flex items-center justify-center">
                           <Check className="h-3 w-3 text-teal" />
                         </div>
@@ -265,8 +261,8 @@ const CreateSwap = () => {
                     </div>
 
                     <div className="space-y-3">
-                      <Label htmlFor="skill_wanted" className="text-base font-bold flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-golden/10 flex items-center justify-center text-golden text-[10px] font-black">?</div>
+                      <Label htmlFor="skill_wanted" className="text-base font-semibold flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-golden/10 flex items-center justify-center text-golden text-[10px] font-bold">?</div>
                         I Want to Learn *
                       </Label>
                       <Input
@@ -301,7 +297,7 @@ const CreateSwap = () => {
               <Card className="border-2 border-teal/10">
                 <CardContent className="pt-6 space-y-8">
                   <div className="space-y-3">
-                    <Label htmlFor="description" className="text-base font-bold">Swap Description</Label>
+                    <Label htmlFor="description" className="text-base font-semibold">Swap Description</Label>
                     <Textarea
                       id="description"
                       name="description"
@@ -311,7 +307,7 @@ const CreateSwap = () => {
                       rows={6}
                       className="text-base resize-none border-muted hover:border-primary/30"
                     />
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <div className="flex justify-between text-xs text-muted-foreground font-medium">
                       <span>Minimum 30 characters recommended</span>
                       <span>{formData.description.length} chars</span>
                     </div>
@@ -319,7 +315,7 @@ const CreateSwap = () => {
 
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-3">
-                      <Label htmlFor="category" className="text-base font-bold">Category *</Label>
+                      <Label htmlFor="category" className="text-base font-semibold">Category *</Label>
                       <Select value={formData.category} onValueChange={(v) => handleSelectChange("category", v)}>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select a category" />
@@ -333,7 +329,7 @@ const CreateSwap = () => {
                     </div>
 
                     <div className="space-y-3">
-                      <Label className="text-base font-bold">Preferred Format *</Label>
+                      <Label className="text-base font-semibold">Preferred Format *</Label>
                       <div className="grid grid-cols-3 gap-2">
                         {formatOptions.map((opt) => (
                           <button
@@ -346,7 +342,7 @@ const CreateSwap = () => {
                               }`}
                           >
                             <opt.icon className={`h-6 w-6 mb-2 ${formData.format === opt.value ? opt.color : "text-muted-foreground"}`} />
-                            <span className={`text-[10px] font-bold uppercase tracking-tighter ${formData.format === opt.value ? "text-primary" : "text-muted-foreground"}`}>
+                            <span className={`text-xs font-semibold uppercase tracking-wider ${formData.format === opt.value ? "text-primary" : "text-muted-foreground"}`}>
                               {opt.label}
                             </span>
                           </button>
@@ -375,7 +371,7 @@ const CreateSwap = () => {
               <Card className="border-2 border-golden/10">
                 <CardContent className="pt-6 space-y-8">
                   <div className="space-y-3">
-                    <Label htmlFor="duration" className="text-base font-bold">Typical Session Duration *</Label>
+                    <Label htmlFor="duration" className="text-base font-semibold">Typical Session Duration *</Label>
                     <Select value={formData.duration} onValueChange={(v) => handleSelectChange("duration", v)}>
                       <SelectTrigger className="h-12">
                         <SelectValue placeholder="Select duration" />
@@ -389,7 +385,7 @@ const CreateSwap = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Label htmlFor="availability" className="text-base font-bold flex items-center gap-2">
+                    <Label htmlFor="availability" className="text-base font-semibold flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-terracotta" />
                       Availability
                     </Label>
@@ -405,7 +401,7 @@ const CreateSwap = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Label htmlFor="preferences" className="text-base font-bold">Extra Preferences</Label>
+                    <Label htmlFor="preferences" className="text-base font-semibold">Extra Preferences</Label>
                     <Input
                       id="preferences"
                       name="preferences"
@@ -437,34 +433,34 @@ const CreateSwap = () => {
                 <div className="md:col-span-2 space-y-6">
                   <Card className="border-2 border-primary/20 overflow-hidden">
                     <div className="bg-primary/5 px-6 py-4 border-b border-primary/10">
-                      <h2 className="text-xl font-bold tracking-tight">{formData.title}</h2>
+                      <h2 className="text-2xl font-bold font-display tracking-tight text-primary-dark">{formData.title || "Your Swap Title"}</h2>
                     </div>
                     <CardContent className="pt-6 space-y-6">
                       <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-xl border border-muted">
                         <div className="flex-1 text-center">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Teaching</p>
-                          <p className="font-bold text-terracotta">{formData.skill_offered}</p>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-1">Teaching</p>
+                          <p className="font-semibold text-lg text-terracotta">{formData.skill_offered || "..."}</p>
                         </div>
                         <div className="h-8 w-px bg-muted" />
                         <div className="flex-1 text-center">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Learning</p>
-                          <p className="font-bold text-teal">{formData.skill_wanted}</p>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-1">Learning</p>
+                          <p className="font-semibold text-lg text-teal">{formData.skill_wanted || "..."}</p>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Description</p>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{formData.description || "No description provided."}</p>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Description</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap font-sans text-foreground/80">{formData.description || "No description provided."}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-muted/20 p-3 rounded-lg border border-muted/50">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Category</p>
-                          <p className="text-sm font-bold">{formData.category}</p>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-1">Category</p>
+                          <p className="text-sm font-semibold">{formData.category || "Not selected"}</p>
                         </div>
                         <div className="bg-muted/20 p-3 rounded-lg border border-muted/50">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Typical Session</p>
-                          <p className="text-sm font-bold">{formData.duration}</p>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-1">Typical Session</p>
+                          <p className="text-sm font-semibold">{formData.duration || "Not set"}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -474,14 +470,14 @@ const CreateSwap = () => {
                 <div className="space-y-6">
                   <Card className="border-muted bg-soft-sand/20">
                     <CardHeader className="pb-3 border-b border-muted/50">
-                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <CardTitle className="text-xs font-semibold uppercase tracking-wider flex items-center gap-2 text-muted-foreground font-sans">
                         <MapPin className="h-4 w-4 text-primary" />
                         Format & Availability
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-4">
                       <div>
-                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Learning Channel</p>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-1 tracking-wider">Learning Channel</p>
                         <div className="flex items-center gap-2 text-sm font-bold">
                           {formData.format === 'online' && <Monitor className="h-4 w-4 text-teal" />}
                           {formData.format === 'in-person' && <MapPin className="h-4 w-4 text-terracotta" />}
@@ -491,13 +487,13 @@ const CreateSwap = () => {
                       </div>
 
                       <div>
-                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">When</p>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground mb-1 tracking-wider">When</p>
                         <p className="text-xs font-medium italic">"{formData.availability || "Flexible availability"}"</p>
                       </div>
 
                       {formData.preferences && (
                         <div className="pt-2 border-t border-muted/50">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">Preferences</p>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground mb-1 tracking-wider">Preferences</p>
                           <p className="text-xs text-muted-foreground leading-snug">{formData.preferences}</p>
                         </div>
                       )}
@@ -508,8 +504,8 @@ const CreateSwap = () => {
                     <div className="flex items-start gap-3">
                       <Sparkles className="h-5 w-5 text-terracotta shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-xs font-bold text-terracotta tracking-tight">Ready to launch?</p>
-                        <p className="text-[10px] text-terracotta/80 mt-1">Your swap will be visible to everyone in the Discover section immediately.</p>
+                        <p className="text-xs font-semibold text-terracotta tracking-tight">Ready to launch?</p>
+                        <p className="text-xs text-terracotta/70 mt-1">Your swap will be visible to everyone in the Discover section immediately.</p>
                       </div>
                     </div>
                   </div>
@@ -519,7 +515,7 @@ const CreateSwap = () => {
           )}
 
           {/* Navigation Buttons */}
-          <div className="mt-12 flex justify-between gap-4 max-w-3xl mx-auto border-t pt-8">
+          <div className="mt-12 flex justify-between gap-4 border-t pt-8">
             <Button
               variant="outline"
               onClick={currentStep === 1 ? () => navigate("/swaps") : prevStep}
@@ -557,8 +553,6 @@ const CreateSwap = () => {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

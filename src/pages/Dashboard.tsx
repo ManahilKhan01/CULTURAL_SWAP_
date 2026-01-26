@@ -179,17 +179,17 @@ const Dashboard = () => {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
             {/* Upcoming Sessions */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="font-display text-xl">Upcoming Sessions</CardTitle>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/schedule">View All</Link>
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-terracotta/20 scrollbar-track-transparent">
-                  {upcomingSessions.length > 0 ? (
-                    upcomingSessions.map((session) => (
+            {upcomingSessions.length > 0 && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="font-display text-xl">Upcoming Sessions</CardTitle>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/schedule">View All</Link>
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-terracotta/20 scrollbar-track-transparent">
+                    {upcomingSessions.map((session) => (
                       <div
                         key={session.id}
                         className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-all border border-transparent hover:border-border"
@@ -219,15 +219,11 @@ const Dashboard = () => {
                           </Badge>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 w-full text-muted-foreground">
-                      <p className="text-sm italic">No upcoming sessions found</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recommended Swaps */}
             <Card>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Filter, MapPin, Star, ArrowRight, X, SlidersHorizontal, Loader2 } from "lucide-react";
+import { Search, Filter, MapPin, Star, ArrowRight, X, SlidersHorizontal, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,6 +95,8 @@ const Discover = () => {
   const [loading, setLoading] = useState(true);
   const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
 
   // Load swaps from database on component mount
   useEffect(() => {
@@ -217,9 +219,22 @@ const Discover = () => {
     setSelectedCategory("all");
     setSelectedFormat("all");
     setSortBy("match");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = searchQuery || selectedCategory !== "all" || selectedFormat !== "all";
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedSwaps.length / itemsPerPage);
+  const paginatedSwaps = sortedSwaps.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (loading && swaps.length === 0) return <DiscoverSkeleton />;
 
@@ -347,12 +362,12 @@ const Discover = () => {
 
         {/* Results Count */}
         <p className="text-sm text-muted-foreground mb-6">
-          Showing {sortedSwaps.length} skill exchange{sortedSwaps.length !== 1 ? 's' : ''}
+          Showing {paginatedSwaps.length} of {sortedSwaps.length} skill exchange{sortedSwaps.length !== 1 ? 's' : ''}
         </p>
 
         {/* Swaps Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedSwaps.map((swap) => {
+          {paginatedSwaps.map((swap) => {
             const profile = profilesMap[swap.user_id];
             return (
               <Card key={swap.id} className="hover-lift overflow-hidden group border-border/50">
@@ -435,6 +450,39 @@ const Discover = () => {
             );
           })}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 mt-12 pb-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="gap-1 hover-lift"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="gap-1 hover-lift"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* Empty State */}
         {!loading && sortedSwaps.length === 0 && (

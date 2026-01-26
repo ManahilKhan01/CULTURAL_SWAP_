@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Send, Loader2, Handshake, ChevronLeft, MoreVertical, CheckCheck, Paperclip, X, Download, FileText, Image as ImageIcon, File, Star, Archive, MessageCircle, Trash2, Bell, Users } from "lucide-react";
+import { Search, Send, Loader2, Handshake, ChevronLeft, MoreVertical, CheckCheck, Paperclip, X, Download, FileText, Image as ImageIcon, File, Star, Archive, MessageCircle, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,8 +46,6 @@ const Messages = () => {
   const [starredChats, setStarredChats] = useState<Set<string>>(new Set());
   const [archivedChats, setArchivedChats] = useState<Set<string>>(new Set());
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [allProfiles, setAllProfiles] = useState<any[]>([]);
-  const [sidebarView, setSidebarView] = useState<'chats' | 'people'>('chats');
 
   // Use the unread messages hook for real-time tracking
   const { markConversationAsRead } = useUnreadMessages(currentUser?.id || null);
@@ -309,10 +307,6 @@ const Messages = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Not authenticated");
         setCurrentUser(user);
-
-        // Load all profiles for the "All Users" view
-        const profiles = await profileService.getAllProfiles(user.id);
-        setAllProfiles(profiles);
 
         await loadConversations(user.id);
 
@@ -704,7 +698,6 @@ const Messages = () => {
       };
 
       await selectConversation(conv);
-      setSidebarView('chats');
     } catch (error) {
       console.error('Error starting chat:', error);
       toast({ title: "Error", description: "Failed to start chat", variant: "destructive" });
@@ -740,16 +733,6 @@ const Messages = () => {
     return name.includes(searchQuery.toLowerCase());
   });
 
-  const filteredProfiles = allProfiles.filter(profile => {
-    const name = profile.full_name?.toLowerCase() || "";
-    const email = profile.email?.toLowerCase() || "";
-    const bio = profile.bio?.toLowerCase() || "";
-    const skills = [...(profile.skills_offered || []), ...(profile.skills_wanted || [])].join(" ").toLowerCase();
-
-    const query = searchQuery.toLowerCase();
-    return name.includes(query) || email.includes(query) || bio.includes(query) || skills.includes(query);
-  });
-
   const canCreateOffer = selectedConversation && currentUser;
 
   return (
@@ -764,19 +747,9 @@ const Messages = () => {
               <div className="p-4 border-b border-border space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSidebarView('chats')}
-                      className={`text-xl font-bold font-display transition-colors ${sidebarView === 'chats' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
+                    <h1 className="text-xl font-bold font-display text-foreground">
                       Messages
-                    </button>
-                    <span className="text-muted-foreground/30 font-light">|</span>
-                    <button
-                      onClick={() => setSidebarView('people')}
-                      className={`text-xl font-bold font-display transition-colors ${sidebarView === 'people' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      People
-                    </button>
+                    </h1>
                   </div>
                   <div className="relative">
                     <Button
@@ -865,7 +838,7 @@ const Messages = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search people..."
+                    placeholder="Search messages..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 bg-background/50 border-muted focus-visible:ring-terracotta"
@@ -915,43 +888,6 @@ const Messages = () => {
                   <div className="p-8 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-terracotta" />
                   </div>
-                ) : sidebarView === 'people' ? (
-                  filteredProfiles.length === 0 ? (
-                    <div className="p-8 text-center text-muted-foreground">
-                      <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">No users found</p>
-                    </div>
-                  ) : (
-                    filteredProfiles.map((profile, idx) => (
-                      <button
-                        key={profile.id}
-                        onClick={() => startChatWithUser(profile)}
-                        className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-all border-b border-border/50 text-left"
-                      >
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={getCacheBustedImageUrl(profile?.profile_image_url)}
-                            alt="Avatar"
-                            className="h-12 w-12 rounded-full object-cover ring-2 ring-background shadow-sm"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground truncate">
-                            {profile?.full_name || 'User'}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {profile.city || profile.country || 'No location set'}
-                          </p>
-                          {profile.skills_offered && profile.skills_offered.length > 0 && (
-                            <p className="text-[10px] text-terracotta font-medium truncate mt-1">
-                              Sells: {profile.skills_offered.join(", ")}
-                            </p>
-                          )}
-                        </div>
-                        <MessageCircle className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                      </button>
-                    ))
-                  )
                 ) : filteredConversations.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
                     <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-20" />
