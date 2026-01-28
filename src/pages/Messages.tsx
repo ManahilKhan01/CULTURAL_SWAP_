@@ -20,7 +20,15 @@ import {
   Sparkles,
   User,
   Image as ImageIcon,
-  File
+  File,
+  Plus,
+  CirclePlus,
+  CircleX,
+  Zap,
+  Camera,
+  Video,
+  Clock,
+  MessageSquareMore,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +43,7 @@ import { offerService, Offer } from "@/lib/offerService";
 import { useToast } from "@/hooks/use-toast";
 import { CreateOfferDialog } from "@/components/CreateOfferDialog";
 import { OfferCard } from "@/components/OfferCard";
+import { CameraModal } from "@/components/CameraModal";
 import { chatManagementService } from "@/lib/chatManagementService";
 import { aiAssistantService } from "@/lib/aiAssistantService";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
@@ -60,6 +69,7 @@ const Messages = () => {
   const [currentSwap, setCurrentSwap] = useState<any>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [createOfferOpen, setCreateOfferOpen] = useState(false);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -68,6 +78,12 @@ const Messages = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'starred' | 'archived' | 'offers' | 'assistant'>('all');
   const [starredChats, setStarredChats] = useState<Set<string>>(new Set());
   const [archivedChats, setArchivedChats] = useState<Set<string>>(new Set());
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [activeQuickSubPanel, setActiveQuickSubPanel] = useState<'main' | 'responses' | 'auto-reply' | 'camera'>('main');
+  const [autoReplyPreview, setAutoReplyPreview] = useState("");
+  const [isGeneratingAutoReply, setIsGeneratingAutoReply] = useState(false);
+
+
 
   // Use the unread messages hook for real-time tracking
   const { markConversationAsRead } = useUnreadMessages(currentUser?.id || null);
@@ -532,6 +548,62 @@ const Messages = () => {
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
+
+  // Enhanced Quick Actions Helpers
+  const handleQuickResponse = async (text: string) => {
+    setMessageText(text);
+    setQuickActionsOpen(false);
+    setActiveQuickSubPanel('main');
+    // We'll let the user click "Send" or we can auto-send
+    // Based on requirements: "Automatically insert/send that message into the chat"
+    // So let's auto-send
+    setTimeout(() => handleSendMessage(), 100);
+  };
+
+  const handleAutoReplyGenerate = async () => {
+    try {
+      setIsGeneratingAutoReply(true);
+      setActiveQuickSubPanel('auto-reply');
+
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1].content : "";
+      const reply = await aiAssistantService.generateResponse(lastMessage, messages);
+
+      setAutoReplyPreview(reply);
+    } catch (error) {
+      console.error('Error generating auto reply:', error);
+      toast({ title: "Error", description: "Failed to generate AI reply", variant: "destructive" });
+    } finally {
+      setIsGeneratingAutoReply(false);
+    }
+  };
+
+  const handleAutoReplySend = () => {
+    setMessageText(autoReplyPreview);
+    setQuickActionsOpen(false);
+    setActiveQuickSubPanel('main');
+    setTimeout(() => handleSendMessage(), 100);
+  };
+
+  const handleInitiateCall = async () => {
+    // Generate a random Google Meet link
+    const randomId = Math.random().toString(36).substring(2, 5) + '-' +
+      Math.random().toString(36).substring(2, 6) + '-' +
+      Math.random().toString(36).substring(2, 5);
+    const meetLink = `https://meet.google.com/${randomId}`;
+    const message = `Let's connect on Google Meet: ${meetLink}`;
+
+    setMessageText(message);
+    setQuickActionsOpen(false);
+    setTimeout(() => handleSendMessage(), 100);
+
+    // Optionally open link
+    window.open(meetLink, '_blank');
+  };
+
+  const handleOpenCamera = () => {
+    setIsCameraModalOpen(true);
+    setQuickActionsOpen(false);
+  };
 
   const handleSendMessage = async () => {
     if (!messageText.trim() && selectedFiles.length === 0) return;
@@ -1127,71 +1199,269 @@ const Messages = () => {
                   </div>
 
                   {/* Message Input */}
-                  <div className="p-4 bg-muted/20 border-t border-border">
-                    {/* Selected Files Preview */}
-                    {selectedFiles.length > 0 && (
-                      <div className="mb-2 space-y-1">
-                        {selectedFiles.map((file, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm"
-                          >
-                            <Paperclip className="h-3 w-3" />
-                            <span className="flex-1 truncate">{file.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {attachmentService.formatFileSize(file.size)}
-                            </span>
-                            <button onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== index))}>
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
+                  <div className="bg-muted/20 border-t border-border">
+                    {/* Quick Actions Panel */}
+                    {quickActionsOpen && (
+                      <div className="bg-background border-b border-border p-4 animate-in slide-in-from-bottom-2 duration-300">
+                        <div className="container max-w-4xl mx-auto">
+                          {activeQuickSubPanel === 'main' && (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-terracotta/5 hover:border-terracotta/30 group transition-all"
+                                onClick={() => {
+                                  setCreateOfferOpen(true);
+                                  setQuickActionsOpen(false);
+                                }}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-terracotta/10 flex items-center justify-center group-hover:bg-terracotta/20">
+                                  <FileText className="h-5 w-5 text-terracotta" />
+                                </div>
+                                <span className="text-xs font-semibold">Create an offer</span>
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-blue-50 hover:border-blue-200 group transition-all"
+                                onClick={() => setActiveQuickSubPanel('responses')}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200">
+                                  <Zap className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <span className="text-xs font-semibold">Quick response</span>
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-teal/5 hover:border-teal/30 group transition-all"
+                                onClick={handleAutoReplyGenerate}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-teal/10 flex items-center justify-center group-hover:bg-teal/20">
+                                  <Clock className="h-5 w-5 text-teal-600" />
+                                </div>
+                                <span className="text-xs font-semibold">Auto Reply</span>
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-amber/5 hover:border-amber/30 group transition-all"
+                                onClick={() => {
+                                  fileInputRef.current?.setAttribute('accept', 'image/*');
+                                  fileInputRef.current?.click();
+                                  setQuickActionsOpen(false);
+                                }}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center group-hover:bg-amber-200">
+                                  <ImageIcon className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <span className="text-xs font-semibold">Photo album</span>
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-indigo/5 hover:border-indigo/30 group transition-all"
+                                onClick={handleInitiateCall}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200">
+                                  <Video className="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <span className="text-xs font-semibold">Initiate call</span>
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                className="flex flex-col items-center justify-center h-24 gap-2 rounded-xl hover:bg-muted group transition-all"
+                                onClick={handleOpenCamera}
+                              >
+                                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80">
+                                  <Camera className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <span className="text-xs font-semibold">Open Camera</span>
+                              </Button>
+                            </div>
+                          )}
+
+                          {activeQuickSubPanel === 'responses' && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-bold flex items-center gap-2">
+                                  <Zap className="h-4 w-4 text-blue-600" />
+                                  Quick Responses
+                                </h4>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setActiveQuickSubPanel('main')}
+                                  className="h-8 text-xs underline"
+                                >
+                                  Back
+                                </Button>
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                {[
+                                  "I will text you later.",
+                                  "I will let you know.",
+                                  "Sounds good, thanks!",
+                                  "Let me check and get back to you.",
+                                  "Sure, that works for me."
+                                ].map((resp, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => handleQuickResponse(resp)}
+                                    className="text-left p-3 rounded-lg bg-muted/30 hover:bg-blue-50 hover:text-blue-700 text-sm transition-colors border border-transparent hover:border-blue-200"
+                                  >
+                                    {resp}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {activeQuickSubPanel === 'auto-reply' && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold flex items-center gap-2">
+                                  <Sparkles className="h-4 w-4 text-blue-500" />
+                                  AI Auto Reply
+                                </h4>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setActiveQuickSubPanel('main')}
+                                  className="h-8 text-xs underline"
+                                >
+                                  Back
+                                </Button>
+                              </div>
+
+                              {isGeneratingAutoReply ? (
+                                <div className="flex flex-col items-center justify-center py-6 gap-3">
+                                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                                  <p className="text-sm text-muted-foreground animate-pulse">Generating reply...</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                                  <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 italic text-sm text-blue-800 leading-relaxed shadow-inner min-h-[60px]">
+                                    "{autoReplyPreview}"
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      className="flex-1 rounded-xl h-11 text-xs"
+                                      onClick={handleAutoReplyGenerate}
+                                    >
+                                      Regenerate
+                                    </Button>
+                                    <Button
+                                      variant="terracotta"
+                                      className="flex-[2] rounded-xl h-11 text-sm shadow-md"
+                                      onClick={handleAutoReplySend}
+                                    >
+                                      Send AI Reply
+                                    </Button>
+                                  </div>
+                                  <p className="text-center text-[10px] text-muted-foreground">
+                                    AI-generated replies are meant for convenience. Please review before sending.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
-                    <div className="container max-w-4xl mx-auto flex gap-2 items-end">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          setSelectedFiles(prev => [...prev, ...files]);
-                        }}
-                        className="hidden"
-                        accept="image/*,.pdf,.doc,.docx"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Paperclip className="h-5 w-5" />
-                      </Button>
-                      <div className="flex-1 flex items-end">
-                        <Textarea
-                          placeholder="Type your message..."
-                          value={messageText}
-                          onChange={(e) => setMessageText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSendMessage();
+
+                    <div className="p-4">
+                      {/* Selected Files Preview */}
+                      {selectedFiles.length > 0 && (
+                        <div className="mb-2 space-y-1">
+                          {selectedFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm"
+                            >
+                              <Paperclip className="h-3 w-3" />
+                              <span className="flex-1 truncate">{file.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {attachmentService.formatFileSize(file.size)}
+                              </span>
+                              <button onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== index))}>
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="container max-w-4xl mx-auto flex gap-2 items-end">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            setSelectedFiles(prev => [...prev, ...files]);
+                          }}
+                          className="hidden"
+                          accept="image/*,.pdf,.doc,.docx"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (quickActionsOpen) {
+                              setQuickActionsOpen(false);
+                            } else {
+                              setActiveQuickSubPanel('main');
+                              setQuickActionsOpen(true);
                             }
                           }}
-                          className="flex-1 resize-none border-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus:shadow-none px-1 py-3 text-sm min-h-[44px] max-h-[120px] bg-transparent"
-                          rows={1}
-                        />
+                          className={`flex-shrink-0 transition-transform ${quickActionsOpen ? 'rotate-0 text-terracotta' : 'rotate-0 text-muted-foreground'}`}
+                        >
+                          {quickActionsOpen ? <CircleX className="h-6 w-6" /> : <CirclePlus className="h-6 w-6" />}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex-shrink-0"
+                        >
+                          <Paperclip className="h-5 w-5" />
+                        </Button>
+                        <div className="flex-1 flex items-end bg-background/50 rounded-2xl border border-border px-3">
+                          <Textarea
+                            placeholder="Type your message..."
+                            value={messageText}
+                            onChange={(e) => {
+                              setMessageText(e.target.value);
+                              // Close quick actions when user starts typing if desired, 
+                              // but requirement says "The quick options panel should not block or override the keyboard"
+                            }}
+                            onFocus={() => {
+                              // Optional: hide quick actions on focus to give space for keyboard
+                              // setQuickActionsOpen(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage();
+                              }
+                            }}
+                            className="flex-1 resize-none border-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus:shadow-none px-1 py-3 text-sm min-h-[44px] max-h-[120px] bg-transparent"
+                            rows={1}
+                          />
+                        </div>
+                        <Button
+                          variant="terracotta"
+                          size="icon"
+                          onClick={handleSendMessage}
+                          disabled={sending || (!messageText.trim() && selectedFiles.length === 0)}
+                          className="h-11 w-11 rounded-2xl shadow-md transition-transform active:scale-95 flex-shrink-0"
+                        >
+                          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        </Button>
                       </div>
-                      <Button
-                        variant="terracotta"
-                        size="icon"
-                        onClick={handleSendMessage}
-                        disabled={sending || (!messageText.trim() && selectedFiles.length === 0)}
-                        className="h-11 w-11 rounded-2xl shadow-md transition-transform active:scale-95"
-                      >
-                        {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                      </Button>
                     </div>
                   </div>
                 </>
@@ -1222,6 +1492,16 @@ const Messages = () => {
           onOfferCreated={handleOfferCreated}
         />
       )}
+
+      <CameraModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={(file) => {
+          setSelectedFiles(prev => [...prev, file]);
+          // We can also auto-trigger send if we want
+          // handleSendMessage(); 
+        }}
+      />
     </div>
   );
 };
